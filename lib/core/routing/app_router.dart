@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/presentation/login_screen.dart';
+import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
+import 'package:nice_tv/features/home/presentation/following_screen.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
+import 'package:nice_tv/features/notifications/presentation/notifications_screen.dart';
+import 'package:nice_tv/features/profile/presentation/channel_profile_screen.dart';
+import 'package:nice_tv/features/search/presentation/search_screen.dart';
 import 'package:nice_tv/features/settings/presentation/settings_screen.dart';
 import 'package:nice_tv/features/vod/presentation/vod_screen.dart';
 import 'package:nice_tv/features/watch/presentation/watch_screen.dart';
@@ -27,6 +32,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/following',
+                builder: (context, state) => const FollowingScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/vods',
                 builder: (context, state) => const VodScreen(),
               ),
@@ -43,6 +56,28 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/profile/:login',
+        builder: (context, state) {
+          return ChannelProfileScreen(
+            login: state.pathParameters['login'],
+            userId: state.uri.queryParameters['userId'],
+          );
+        },
+      ),
+      GoRoute(
+        path: '/category/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final name = state.uri.queryParameters['name'] ?? 'Category';
+          return CategoryStreamsScreen(gameId: id, name: name);
+        },
+      ),
       GoRoute(
         path: '/watch/:login',
         builder: (context, state) {
@@ -92,6 +127,11 @@ class _MainShell extends StatelessWidget {
             icon: Icon(Icons.live_tv_outlined),
             selectedIcon: Icon(Icons.live_tv),
             label: 'Live',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.favorite_outline),
+            selectedIcon: Icon(Icons.favorite),
+            label: 'Following',
           ),
           NavigationDestination(
             icon: Icon(Icons.video_library_outlined),

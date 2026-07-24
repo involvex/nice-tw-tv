@@ -7,9 +7,9 @@ import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _IdleHomeFeed extends HomeFeedController {
+class _IdlePopularFeed extends PopularFeedController {
   @override
-  HomeFeedState build() => const HomeFeedState();
+  StreamFeedState build() => const StreamFeedState();
 
   @override
   Future<void> refresh() async {}
@@ -39,7 +39,7 @@ void main() {
       ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          homeFeedControllerProvider.overrideWith(_IdleHomeFeed.new),
+          popularFeedControllerProvider.overrideWith(_IdlePopularFeed.new),
           authControllerProvider.overrideWith(_IdleAuth.new),
         ],
         child: const NiceTvApp(),
@@ -48,6 +48,7 @@ void main() {
     await tester.pump();
     expect(find.text('Nice TV'), findsWidgets);
     expect(find.text('Live'), findsOneWidget);
+    expect(find.text('Following'), findsOneWidget);
     expect(find.text('VODs'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
   });

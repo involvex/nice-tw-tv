@@ -55,15 +55,19 @@ query PlaybackAccessToken(
       vodId: '',
       isVod: false,
     );
-    return Uri.https('usher.ttvnw.net', '/api/v2/channel/hls/$channelLogin.m3u8', {
-      'client_id': webClientId,
-      'token': token.value,
-      'sig': token.signature,
-      'allow_source': 'true',
-      'allow_audio_only': 'true',
-      'fast_bread': 'true',
-      'p': '${DateTime.now().millisecondsSinceEpoch % 9999999}',
-    });
+    return Uri.https(
+      'usher.ttvnw.net',
+      '/api/v2/channel/hls/$channelLogin.m3u8',
+      {
+        'client_id': webClientId,
+        'token': token.value,
+        'sig': token.signature,
+        'allow_source': 'true',
+        'allow_audio_only': 'true',
+        'fast_bread': 'true',
+        'p': '${DateTime.now().millisecondsSinceEpoch % 9999999}',
+      },
+    );
   }
 
   Future<Uri> resolveVod(String vodId) async {
@@ -103,15 +107,13 @@ query PlaybackAccessToken(
         },
       },
       options: Options(
-        headers: {
-          'Client-ID': webClientId,
-          'Content-Type': 'application/json',
-        },
+        headers: {'Client-ID': webClientId, 'Content-Type': 'application/json'},
       ),
     );
     final data = response.data?['data'] as Map<String, dynamic>?;
     final node =
-        (data?['streamPlaybackAccessToken'] ?? data?['videoPlaybackAccessToken'])
+        (data?['streamPlaybackAccessToken'] ??
+                data?['videoPlaybackAccessToken'])
             as Map<String, dynamic>?;
     if (node == null) {
       throw StateError('No playback access token returned for Twitch media');

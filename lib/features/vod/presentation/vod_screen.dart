@@ -40,8 +40,14 @@ class VodFeedController extends Notifier<VodFeedState> {
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final page = await ref.read(helixRepositoryProvider).getTopArchiveVideos();
-      state = state.copyWith(vods: page.vods, isLoading: false, clearError: true);
+      final page = await ref
+          .read(helixRepositoryProvider)
+          .getTopArchiveVideos();
+      state = state.copyWith(
+        vods: page.vods,
+        isLoading: false,
+        clearError: true,
+      );
     } on Object catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }

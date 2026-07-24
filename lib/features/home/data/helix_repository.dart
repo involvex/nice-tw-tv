@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/core/env/app_env.dart';
 import 'package:nice_tv/core/network/dio_providers.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
 
@@ -81,6 +82,82 @@ class HelixRepository {
     return StreamsPage(streams: streams);
   }
 
+  Future<List<TwitchCategory>> searchCategories(String query) async {
+    if (query.trim().isEmpty) return const [];
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/search/categories',
+      queryParameters: {'query': query.trim(), 'first': 20},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => TwitchCategory.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<TwitchCategory>> getTopGames({int first = 20}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/games/top',
+      queryParameters: {'first': first},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => TwitchCategory.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<StreamsPage> getStreamsByGame({
+    required String gameId,
+    String? cursor,
+    int first = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/streams',
+      queryParameters: {
+        'game_id': gameId,
+        'first': first,
+        if (cursor != null && cursor.isNotEmpty) 'after': cursor,
+      },
+    );
+    return _parseStreamsPage(response.data!);
+  }
+
+  Future<StreamsPage> getStreamsByUser({
+    required String userId,
+    int first = 1,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/streams',
+      queryParameters: {'user_id': userId, 'first': first},
+    );
+    return _parseStreamsPage(response.data!);
+  }
+
+  Future<TwitchUserProfile?> getUserProfile({
+    String? login,
+    String? id,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/users',
+      queryParameters: {
+        'login': ?login,
+        'id': ?id,
+      },
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    if (data.isEmpty) return null;
+    return TwitchUserProfile.fromJson(data.first as Map<String, dynamic>);
+  }
+
+  Future<TwitchChannelInfo?> getChannelInfo(String broadcasterId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/channels',
+      queryParameters: {'broadcaster_id': broadcasterId},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    if (data.isEmpty) return null;
+    return TwitchChannelInfo.fromJson(data.first as Map<String, dynamic>);
+  }
+
   Future<VodsPage> getVideos({
     String? userId,
     String? cursor,
@@ -152,16 +229,13 @@ final helixRepositoryProvider = Provider<HelixRepository>((ref) {
   return HelixRepository(ref.watch(helixDioProvider));
 });
 
-enum HomeFeedTab { live, following }
-
-class HomeFeedState {
-  const HomeFeedState({
+class StreamFeedState {
+  const StreamFeedState({
     this.streams = const [],
     this.cursor,
     this.isLoading = false,
     this.isLoadingMore = false,
     this.error,
-    this.tab = HomeFeedTab.live,
   });
 
   final List<TwitchStream> streams;
@@ -169,9 +243,8 @@ class HomeFeedState {
   final bool isLoading;
   final bool isLoadingMore;
   final String? error;
-  final HomeFeedTab tab;
 
-  HomeFeedState copyWith({
+  StreamFeedState copyWith({
     List<TwitchStream>? streams,
     String? cursor,
     bool clearCursor = false,
@@ -179,30 +252,22 @@ class HomeFeedState {
     bool? isLoadingMore,
     String? error,
     bool clearError = false,
-    HomeFeedTab? tab,
   }) {
-    return HomeFeedState(
+    return StreamFeedState(
       streams: streams ?? this.streams,
       cursor: clearCursor ? null : (cursor ?? this.cursor),
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: clearError ? null : (error ?? this.error),
-      tab: tab ?? this.tab,
     );
   }
 }
 
-class HomeFeedController extends Notifier<HomeFeedState> {
+class PopularFeedController extends Notifier<StreamFeedState> {
   @override
-  HomeFeedState build() {
+  StreamFeedState build() {
     Future.microtask(refresh);
-    return const HomeFeedState(isLoading: true);
-  }
-
-  Future<void> setTab(HomeFeedTab tab) async {
-    if (state.tab == tab) return;
-    state = state.copyWith(tab: tab, isLoading: true, clearError: true);
-    await refresh();
+    return const StreamFeedState(isLoading: true);
   }
 
   Future<void> refresh() async {
@@ -212,7 +277,7 @@ class HomeFeedController extends Notifier<HomeFeedState> {
       clearCursor: true,
     );
     try {
-      final page = await _fetchPage();
+      final page = await ref.read(helixRepositoryProvider).getTopStreams();
       state = state.copyWith(
         streams: page.streams,
         cursor: page.cursor,
@@ -228,7 +293,9 @@ class HomeFeedController extends Notifier<HomeFeedState> {
     if (state.isLoadingMore || state.isLoading || state.cursor == null) return;
     state = state.copyWith(isLoadingMore: true);
     try {
-      final page = await _fetchPage(cursor: state.cursor);
+      final page = await ref
+          .read(helixRepositoryProvider)
+          .getTopStreams(cursor: state.cursor);
       state = state.copyWith(
         streams: [...state.streams, ...page.streams],
         cursor: page.cursor,
@@ -238,19 +305,67 @@ class HomeFeedController extends Notifier<HomeFeedState> {
       state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
+}
 
-  Future<StreamsPage> _fetchPage({String? cursor}) async {
-    final helix = ref.read(helixRepositoryProvider);
-    if (state.tab == HomeFeedTab.following) {
+final popularFeedControllerProvider =
+    NotifierProvider<PopularFeedController, StreamFeedState>(
+      PopularFeedController.new,
+    );
+
+class FollowingFeedController extends Notifier<StreamFeedState> {
+  @override
+  StreamFeedState build() {
+    Future.microtask(refresh);
+    return const StreamFeedState(isLoading: true);
+  }
+
+  Future<void> refresh() async {
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearCursor: true,
+    );
+    try {
       final auth = ref.read(authControllerProvider).value;
       if (auth == null || !auth.isLoggedIn || auth.userId == null) {
-        return const StreamsPage(streams: []);
+        state = state.copyWith(streams: const [], isLoading: false);
+        return;
       }
-      return helix.getFollowedStreams(userId: auth.userId!, cursor: cursor);
+      final page = await ref
+          .read(helixRepositoryProvider)
+          .getFollowedStreams(userId: auth.userId!);
+      state = state.copyWith(
+        streams: page.streams,
+        cursor: page.cursor,
+        isLoading: false,
+        clearError: true,
+      );
+    } on Object catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
-    return helix.getTopStreams(cursor: cursor);
+  }
+
+  Future<void> loadMore() async {
+    if (state.isLoadingMore || state.isLoading || state.cursor == null) return;
+    final auth = ref.read(authControllerProvider).value;
+    if (auth?.userId == null) return;
+    state = state.copyWith(isLoadingMore: true);
+    try {
+      final page = await ref
+          .read(helixRepositoryProvider)
+          .getFollowedStreams(userId: auth!.userId!, cursor: state.cursor);
+      state = state.copyWith(
+        streams: [...state.streams, ...page.streams],
+        cursor: page.cursor,
+        isLoadingMore: false,
+      );
+    } on Object catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
+    }
   }
 }
 
-final homeFeedControllerProvider =
-    NotifierProvider<HomeFeedController, HomeFeedState>(HomeFeedController.new);
+final followingFeedControllerProvider =
+    NotifierProvider<FollowingFeedController, StreamFeedState>(
+      FollowingFeedController.new,
+    );

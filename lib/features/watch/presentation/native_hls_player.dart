@@ -5,14 +5,11 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:nice_tv/features/watch/data/hls_resolver.dart';
 
 class NativeHlsPlayer extends ConsumerStatefulWidget {
-  const NativeHlsPlayer({
-    super.key,
-    this.channelLogin,
-    this.vodId,
-  }) : assert(
-         channelLogin != null || vodId != null,
-         'Provide channelLogin or vodId',
-       );
+  const NativeHlsPlayer({super.key, this.channelLogin, this.vodId})
+    : assert(
+        channelLogin != null || vodId != null,
+        'Provide channelLogin or vodId',
+      );
 
   final String? channelLogin;
   final String? vodId;

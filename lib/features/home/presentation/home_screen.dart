@@ -5,34 +5,119 @@ import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
+import 'package:nice_tv/features/settings/data/settings_controller.dart';
+
+enum HomeFeedMode { cards, autoplay }
+
+final homeFeedModeProvider =
+    NotifierProvider<HomeFeedModeController, HomeFeedMode>(
+      HomeFeedModeController.new,
+    );
+
+class HomeFeedModeController extends Notifier<HomeFeedMode> {
+  static const _key = 'home_feed_mode';
+
+  @override
+  HomeFeedMode build() {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    final raw = prefs.getString(_key);
+    return raw == HomeFeedMode.autoplay.name
+        ? HomeFeedMode.autoplay
+        : HomeFeedMode.cards;
+  }
+
+  Future<void> setMode(HomeFeedMode mode) async {
+    await ref.read(sharedPreferencesProvider).setString(_key, mode.name);
+    state = mode;
+  }
+
+  Future<void> toggle() async {
+    await setMode(
+      state == HomeFeedMode.cards ? HomeFeedMode.autoplay : HomeFeedMode.cards,
+    );
+  }
+}
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final feed = ref.watch(homeFeedControllerProvider);
+    final feed = ref.watch(popularFeedControllerProvider);
+    final mode = ref.watch(homeFeedModeProvider);
     final auth = ref.watch(authControllerProvider).value;
     final theme = Theme.of(context);
+
+    if (mode == HomeFeedMode.autoplay) {
+      return Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.black45,
+          title: const Text('Nice TV'),
+          titleTextStyle: theme.textTheme.titleMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
+          actions: [
+            IconButton(
+              tooltip: 'Card feed',
+              onPressed: () => ref.read(homeFeedModeProvider.notifier).toggle(),
+              icon: const Icon(Icons.view_agenda_outlined),
+            ),
+            IconButton(
+              tooltip: 'Search',
+              onPressed: () => context.push('/search'),
+              icon: const Icon(Icons.search),
+            ),
+          ],
+        ),
+        body: feed.isLoading && feed.streams.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : AutoplayFeed(
+                streams: feed.streams,
+                onNearEnd: () =>
+                    ref.read(popularFeedControllerProvider.notifier).loadMore(),
+              ),
+      );
+    }
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () =>
-            ref.read(homeFeedControllerProvider.notifier).refresh(),
+            ref.read(popularFeedControllerProvider.notifier).refresh(),
         child: CustomScrollView(
           slivers: [
-            SliverAppBar.large(
+            SliverAppBar(
+              pinned: true,
               title: Text(
                 'Nice TV',
-                style: theme.textTheme.headlineMedium?.copyWith(
+                style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+                  letterSpacing: -0.3,
                 ),
               ),
               actions: [
+                IconButton(
+                  tooltip: 'Autoplay feed',
+                  onPressed: () =>
+                      ref.read(homeFeedModeProvider.notifier).toggle(),
+                  icon: const Icon(Icons.swipe_vertical),
+                ),
+                IconButton(
+                  tooltip: 'Search',
+                  onPressed: () => context.push('/search'),
+                  icon: const Icon(Icons.search),
+                ),
+                IconButton(
+                  tooltip: 'Notifications',
+                  onPressed: () => context.push('/notifications'),
+                  icon: const Icon(Icons.notifications_outlined),
+                ),
                 if (auth?.isLoggedIn == true)
                   Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: 12),
                     child: Center(
                       child: Text(
                         auth!.login ?? '',
@@ -49,44 +134,12 @@ class HomeScreen extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Live feed & popular streams',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<HomeFeedTab>(
-                      segments: const [
-                        ButtonSegment(
-                          value: HomeFeedTab.live,
-                          label: Text('Popular'),
-                          icon: Icon(Icons.trending_up),
-                        ),
-                        ButtonSegment(
-                          value: HomeFeedTab.following,
-                          label: Text('Following'),
-                          icon: Icon(Icons.favorite_outline),
-                        ),
-                      ],
-                      selected: {feed.tab},
-                      onSelectionChanged: (set) {
-                        final tab = set.first;
-                        if (tab == HomeFeedTab.following &&
-                            auth?.isLoggedIn != true) {
-                          context.push('/login');
-                          return;
-                        }
-                        ref
-                            .read(homeFeedControllerProvider.notifier)
-                            .setTab(tab);
-                      },
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Text(
+                  'Live feed & popular streams',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
@@ -98,17 +151,16 @@ class HomeScreen extends ConsumerWidget {
               SliverFillRemaining(
                 child: _ErrorPane(
                   message: feed.error!,
-                  onRetry: () =>
-                      ref.read(homeFeedControllerProvider.notifier).refresh(),
+                  onRetry: () => ref
+                      .read(popularFeedControllerProvider.notifier)
+                      .refresh(),
                 ),
               )
             else if (feed.streams.isEmpty)
               SliverFillRemaining(
                 child: Center(
                   child: Text(
-                    feed.tab == HomeFeedTab.following
-                        ? 'No followed live channels right now.'
-                        : 'No live streams found.',
+                    'No live streams found.',
                     style: theme.textTheme.bodyLarge,
                   ),
                 ),
@@ -122,7 +174,9 @@ class HomeScreen extends ConsumerWidget {
                   separatorBuilder: (_, _) => const SizedBox(height: 14),
                   itemBuilder: (context, index) {
                     if (index >= feed.streams.length) {
-                      ref.read(homeFeedControllerProvider.notifier).loadMore();
+                      ref
+                          .read(popularFeedControllerProvider.notifier)
+                          .loadMore();
                       return const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16),
                         child: Center(child: CircularProgressIndicator()),
@@ -139,7 +193,7 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-String _formatViewers(int count) {
+String formatViewers(int count) {
   if (count >= 1000000) {
     return '${(count / 1000000).toStringAsFixed(1)}M';
   }
@@ -157,21 +211,21 @@ class StreamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final viewers = _formatViewers(stream.viewerCount);
+    final viewers = formatViewers(stream.viewerCount);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () {
-        final uri = Uri(
-          path: '/watch/${stream.userLogin}',
-          queryParameters: {'title': stream.title, 'userId': stream.userId},
-        );
-        context.push(uri.toString());
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            final uri = Uri(
+              path: '/watch/${stream.userLogin}',
+              queryParameters: {'title': stream.title, 'userId': stream.userId},
+            );
+            context.push(uri.toString());
+          },
+          child: AspectRatio(
             aspectRatio: 16 / 9,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -207,26 +261,46 @@ class StreamCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            stream.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          stream.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 2),
-          Text(
-            '${stream.userName} · ${stream.gameName}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Flexible(
+              child: InkWell(
+                onTap: () => context.push(
+                  '/profile/${stream.userLogin}?userId=${stream.userId}',
+                ),
+                child: Text(
+                  stream.userName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
+            Text(
+              ' · ${stream.gameName}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
