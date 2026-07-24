@@ -1,0 +1,317 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nice_tv/features/chat/data/chat_client.dart';
+import 'package:nice_tv/features/chat/data/irc_message.dart';
+import 'package:nice_tv/features/emotes/data/emote.dart';
+import 'package:nice_tv/features/emotes/data/emote_repository.dart';
+import 'package:nice_tv/features/settings/data/settings_controller.dart';
+
+class ChatPanel extends ConsumerStatefulWidget {
+  const ChatPanel({
+    super.key,
+    required this.channelLogin,
+    required this.broadcasterId,
+  });
+
+  final String channelLogin;
+  final String? broadcasterId;
+
+  @override
+  ConsumerState<ChatPanel> createState() => _ChatPanelState();
+}
+
+class _ChatPanelState extends ConsumerState<ChatPanel> {
+  final _input = TextEditingController();
+  final _scroll = ScrollController();
+  final _focus = FocusNode();
+  var _suggestions = <Emote>[];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatControllerProvider.notifier).connect(widget.channelLogin);
+    });
+    _input.addListener(_onInputChanged);
+  }
+
+  @override
+  void dispose() {
+    _input
+      ..removeListener(_onInputChanged)
+      ..dispose();
+    _scroll.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _onInputChanged() {
+    final catalog = ref
+        .read(channelEmotesProvider(widget.broadcasterId ?? ''))
+        .value;
+    if (catalog == null) {
+      setState(() => _suggestions = []);
+      return;
+    }
+    final text = _input.text;
+    final match = RegExp(r'(?:^|\s)(:?\w+)$').firstMatch(text);
+    if (match == null) {
+      setState(() => _suggestions = []);
+      return;
+    }
+    final token = match.group(1)!.replaceFirst(':', '');
+    setState(() => _suggestions = catalog.suggest(token));
+  }
+
+  void _applySuggestion(Emote emote) {
+    final text = _input.text;
+    final match = RegExp(r'(?:^|\s)(:?\w+)$').firstMatch(text);
+    if (match == null) return;
+    final start = match.start == 0 ? 0 : match.start + 1;
+    final next = '${text.substring(0, start)}${emote.name} ';
+    _input
+      ..text = next
+      ..selection = TextSelection.collapsed(offset: next.length);
+    setState(() => _suggestions = []);
+    _focus.requestFocus();
+  }
+
+  void _send() {
+    final text = _input.text.trim();
+    if (text.isEmpty) return;
+    ref.read(chatControllerProvider.notifier).send(text);
+    _input.clear();
+    setState(() => _suggestions = []);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = ref.watch(chatControllerProvider);
+    final emotesAsync = ref.watch(
+      channelEmotesProvider(widget.broadcasterId ?? ''),
+    );
+    final density = ref.watch(
+      settingsControllerProvider.select((s) => s.chatDensity),
+    );
+    final pad = switch (density) {
+      0 => 4.0,
+      2 => 10.0,
+      _ => 6.0,
+    };
+    final fontSize = switch (density) {
+      0 => 12.0,
+      2 => 16.0,
+      _ => 14.0,
+    };
+
+    ref.listen(chatControllerProvider, (prev, next) {
+      if (_scroll.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scroll.hasClients) {
+            _scroll.jumpTo(_scroll.position.maxScrollExtent);
+          }
+        });
+      }
+    });
+
+    final catalog = emotesAsync.value ?? EmoteCatalog();
+
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _scroll,
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: pad),
+            itemCount: chat.messages.length,
+            itemBuilder: (context, index) {
+              final msg = chat.messages[index];
+              return Padding(
+                padding: EdgeInsets.symmetric(vertical: pad / 2),
+                child: ChatMessageTile(
+                  message: msg,
+                  catalog: catalog,
+                  fontSize: fontSize,
+                ),
+              );
+            },
+          ),
+        ),
+        if (_suggestions.isNotEmpty)
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: _suggestions.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
+              itemBuilder: (context, index) {
+                final emote = _suggestions[index];
+                return ActionChip(
+                  avatar: CachedNetworkImage(
+                    imageUrl: emote.url,
+                    width: 20,
+                    height: 20,
+                  ),
+                  label: Text(emote.name),
+                  onPressed: () => _applySuggestion(emote),
+                );
+              },
+            ),
+          ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: 'Emotes',
+                  onPressed: () => _openEmotePicker(catalog),
+                  icon: const Icon(Icons.emoji_emotions_outlined),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    focusNode: _focus,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: const InputDecoration(
+                      hintText: 'Send a message',
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _send,
+                  icon: const Icon(Icons.send),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openEmotePicker(EmoteCatalog catalog) async {
+    final selected = await showModalBottomSheet<Emote>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final emotes = catalog.all;
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.55,
+          builder: (context, controller) {
+            return Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Emotes'),
+                ),
+                Expanded(
+                  child: GridView.builder(
+                    controller: controller,
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 6,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                        ),
+                    itemCount: emotes.length,
+                    itemBuilder: (context, index) {
+                      final emote = emotes[index];
+                      return InkWell(
+                        onTap: () => Navigator.pop(context, emote),
+                        child: CachedNetworkImage(imageUrl: emote.url),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (selected == null) return;
+    final next = '${_input.text}${selected.name} ';
+    _input
+      ..text = next
+      ..selection = TextSelection.collapsed(offset: next.length);
+  }
+}
+
+class ChatMessageTile extends StatelessWidget {
+  const ChatMessageTile({
+    super.key,
+    required this.message,
+    required this.catalog,
+    required this.fontSize,
+  });
+
+  final ChatMessage message;
+  final EmoteCatalog catalog;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (message.system) {
+      return Text(
+        message.message,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontStyle: FontStyle.italic,
+          fontSize: fontSize - 1,
+        ),
+      );
+    }
+
+    final color = _parseColor(message.color) ?? theme.colorScheme.primary;
+    final segments = tokenizeMessage(message.message, catalog);
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '${message.displayName}: ',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: fontSize,
+            ),
+          ),
+          for (final segment in segments)
+            switch (segment) {
+              TextSegment(:final value) => TextSpan(
+                text: value,
+                style: TextStyle(fontSize: fontSize),
+              ),
+              EmoteSegment(:final emote) => WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: CachedNetworkImage(
+                    imageUrl: emote.url,
+                    height: fontSize + 8,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            },
+        ],
+      ),
+    );
+  }
+
+  Color? _parseColor(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    final cleaned = hex.replaceFirst('#', '');
+    if (cleaned.length != 6) return null;
+    return Color(int.parse('FF$cleaned', radix: 16));
+  }
+}

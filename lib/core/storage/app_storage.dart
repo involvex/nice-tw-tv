@@ -1,0 +1,66 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class TokenStorage {
+  TokenStorage({FlutterSecureStorage? secureStorage})
+    : _secure = secureStorage ?? const FlutterSecureStorage();
+
+  static const _userTokenKey = 'twitch_user_access_token';
+  static const _userLoginKey = 'twitch_user_login';
+  static const _userIdKey = 'twitch_user_id';
+
+  final FlutterSecureStorage _secure;
+
+  Future<String?> readUserToken() => _secure.read(key: _userTokenKey);
+
+  Future<void> writeUserSession({
+    required String token,
+    required String login,
+    required String userId,
+  }) async {
+    await _secure.write(key: _userTokenKey, value: token);
+    await _secure.write(key: _userLoginKey, value: login);
+    await _secure.write(key: _userIdKey, value: userId);
+  }
+
+  Future<String?> readLogin() => _secure.read(key: _userLoginKey);
+
+  Future<String?> readUserId() => _secure.read(key: _userIdKey);
+
+  Future<void> clearUserSession() async {
+    await _secure.delete(key: _userTokenKey);
+    await _secure.delete(key: _userLoginKey);
+    await _secure.delete(key: _userIdKey);
+  }
+}
+
+class SettingsStorage {
+  SettingsStorage(this._prefs);
+
+  final SharedPreferences _prefs;
+
+  static const themeModeKey = 'theme_mode';
+  static const accentKey = 'accent_color';
+  static const chatDensityKey = 'chat_density';
+  static const videoQualityKey = 'video_quality';
+
+  String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
+
+  Future<void> setThemeMode(String value) =>
+      _prefs.setString(themeModeKey, value);
+
+  int get accentArgb => _prefs.getInt(accentKey) ?? 0xFF1FA2A6;
+
+  Future<void> setAccentArgb(int value) => _prefs.setInt(accentKey, value);
+
+  /// 0 compact, 1 comfortable, 2 spacious
+  int get chatDensity => _prefs.getInt(chatDensityKey) ?? 1;
+
+  Future<void> setChatDensity(int value) =>
+      _prefs.setInt(chatDensityKey, value);
+
+  String get videoQuality => _prefs.getString(videoQualityKey) ?? 'auto';
+
+  Future<void> setVideoQuality(String value) =>
+      _prefs.setString(videoQualityKey, value);
+}

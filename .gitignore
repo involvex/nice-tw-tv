@@ -1,11 +1,16 @@
 # Miscellaneous
 *.class
-*.lock
 *.log
 *.pyc
 *.swp
 .buildlog/
 .history
+.idea/
+*.iml
+
+# Keep Flutter dependency lockfile
+*.lock
+!pubspec.lock
 
 
 
