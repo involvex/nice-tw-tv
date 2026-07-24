@@ -133,16 +133,10 @@ class HelixRepository {
     return _parseStreamsPage(response.data!);
   }
 
-  Future<TwitchUserProfile?> getUserProfile({
-    String? login,
-    String? id,
-  }) async {
+  Future<TwitchUserProfile?> getUserProfile({String? login, String? id}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/helix/users',
-      queryParameters: {
-        'login': ?login,
-        'id': ?id,
-      },
+      queryParameters: {'login': ?login, 'id': ?id},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     if (data.isEmpty) return null;
@@ -157,6 +151,52 @@ class HelixRepository {
     final data = response.data?['data'] as List<dynamic>? ?? [];
     if (data.isEmpty) return null;
     return TwitchChannelInfo.fromJson(data.first as Map<String, dynamic>);
+  }
+
+  Future<List<({String id, String login, String displayName})>>
+  getFollowedChannels({required String userId, int first = 100}) async {
+    final users = <({String id, String login, String displayName})>[];
+    String? cursor;
+    while (users.length < first) {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/helix/channels/followed',
+        queryParameters: {
+          'user_id': userId,
+          'first': (first - users.length).clamp(1, 100),
+          'after': ?cursor,
+        },
+      );
+      final data = response.data?['data'] as List<dynamic>? ?? [];
+      for (final raw in data) {
+        final json = raw as Map<String, dynamic>;
+        users.add((
+          id: json['broadcaster_id'] as String? ?? '',
+          login: json['broadcaster_login'] as String? ?? '',
+          displayName: json['broadcaster_name'] as String? ?? '',
+        ));
+      }
+      final pagination = response.data?['pagination'] as Map<String, dynamic>?;
+      cursor = pagination?['cursor'] as String?;
+      if (cursor == null || data.isEmpty) break;
+    }
+    return users.where((u) => u.id.isNotEmpty).toList();
+  }
+
+  Future<void> createEventSubSubscription({
+    required String type,
+    required String version,
+    required Map<String, String> condition,
+    required String sessionId,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/helix/eventsub/subscriptions',
+      data: {
+        'type': type,
+        'version': version,
+        'condition': condition,
+        'transport': {'method': 'websocket', 'session_id': sessionId},
+      },
+    );
   }
 
   Future<BadgeCatalog> getGlobalChatBadges() async {

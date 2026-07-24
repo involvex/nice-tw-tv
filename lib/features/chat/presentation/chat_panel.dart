@@ -33,6 +33,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   final _scroll = ScrollController();
   final _focus = FocusNode();
   var _suggestions = <Emote>[];
+  ChatMessage? _replyingTo;
 
   @override
   void initState() {
@@ -87,9 +88,32 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   void _send() {
     final text = _input.text.trim();
     if (text.isEmpty) return;
-    ref.read(chatControllerProvider.notifier).send(text);
+    final parent = _replyingTo;
+    ref
+        .read(chatControllerProvider.notifier)
+        .send(
+          text,
+          replyParentMsgId: parent?.id,
+          replyEcho: parent == null
+              ? null
+              : ChatReplyParent(
+                  messageId: parent.id,
+                  userLogin: parent.login,
+                  displayName: parent.displayName,
+                  body: parent.message,
+                ),
+        );
     _input.clear();
-    setState(() => _suggestions = []);
+    setState(() {
+      _suggestions = [];
+      _replyingTo = null;
+    });
+  }
+
+  void _startReply(ChatMessage message) {
+    if (message.system) return;
+    setState(() => _replyingTo = message);
+    _focus.requestFocus();
   }
 
   String _statusLabel(ChatLinkStatus status) {
@@ -152,6 +176,8 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
         ? 'Sign in to chat'
         : !chat.connected
         ? 'Waiting for connection…'
+        : _replyingTo != null
+        ? 'Reply to ${_replyingTo!.displayName}'
         : 'Send a message';
 
     return Column(
@@ -203,11 +229,33 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                   catalog: catalog,
                   badges: badges,
                   fontSize: fontSize,
+                  onReply: canSend ? () => _startReply(msg) : null,
                 ),
               );
             },
           ),
         ),
+        if (_replyingTo != null)
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.reply, size: 18),
+              title: Text(
+                'Replying to ${_replyingTo!.displayName}',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              subtitle: Text(
+                _replyingTo!.message,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() => _replyingTo = null),
+              ),
+            ),
+          ),
         if (_suggestions.isNotEmpty)
           SizedBox(
             height: 48,
@@ -424,12 +472,14 @@ class ChatMessageTile extends StatelessWidget {
     required this.catalog,
     required this.badges,
     required this.fontSize,
+    this.onReply,
   });
 
   final ChatMessage message;
   final EmoteCatalog catalog;
   final BadgeCatalog badges;
   final double fontSize;
+  final VoidCallback? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -448,49 +498,95 @@ class ChatMessageTile extends StatelessWidget {
     final color = _parseColor(message.color) ?? theme.colorScheme.primary;
     final segments = tokenizeMessage(message.message, catalog);
     final resolvedBadges = badges.resolveAll(message.badges);
+    final cheerColor = theme.colorScheme.tertiary;
 
-    return Text.rich(
-      TextSpan(
+    return InkWell(
+      onLongPress: onReply,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final badge in resolvedBadges)
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 3),
-                child: CachedNetworkImage(
-                  imageUrl: badge.imageUrl,
-                  height: fontSize + 2,
-                  width: fontSize + 2,
-                  fit: BoxFit.contain,
-                ),
+          if (message.replyParent case final parent?)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2, left: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.subdirectory_arrow_right,
+                    size: fontSize,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${parent.displayName}: ${parent.body}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          TextSpan(
-            text: '${message.displayName}: ',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: fontSize,
-            ),
-          ),
-          for (final segment in segments)
-            switch (segment) {
-              TextSegment(:final value) => TextSpan(
-                text: value,
-                style: TextStyle(fontSize: fontSize),
-              ),
-              EmoteSegment(:final emote) => WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 1),
-                  child: CachedNetworkImage(
-                    imageUrl: emote.url,
-                    height: fontSize + 8,
-                    fit: BoxFit.contain,
+          Text.rich(
+            TextSpan(
+              children: [
+                for (final badge in resolvedBadges)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 3),
+                      child: CachedNetworkImage(
+                        imageUrl: badge.imageUrl,
+                        height: fontSize + 2,
+                        width: fontSize + 2,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                if (message.isCheer)
+                  TextSpan(
+                    text: 'Cheer ${message.bits} ',
+                    style: TextStyle(
+                      color: cheerColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: fontSize - 1,
+                    ),
+                  ),
+                TextSpan(
+                  text: '${message.displayName}: ',
+                  style: TextStyle(
+                    color: message.isCheer ? cheerColor : color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: fontSize,
                   ),
                 ),
-              ),
-            },
+                for (final segment in segments)
+                  switch (segment) {
+                    TextSegment(:final value) => TextSpan(
+                      text: value,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        color: message.isCheer ? cheerColor : null,
+                        fontWeight: message.isCheer ? FontWeight.w600 : null,
+                      ),
+                    ),
+                    EmoteSegment(:final emote) => WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        child: CachedNetworkImage(
+                          imageUrl: emote.url,
+                          height: fontSize + 8,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  },
+              ],
+            ),
+          ),
         ],
       ),
     );

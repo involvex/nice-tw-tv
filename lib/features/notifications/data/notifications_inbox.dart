@@ -3,9 +3,12 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nice_tv/core/network/dio_providers.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/notifications/data/eventsub_client.dart';
+import 'package:nice_tv/features/notifications/data/local_push_service.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -80,6 +83,18 @@ class LiveNotificationItem {
       wentLiveAt: stream.startedAt,
     );
   }
+
+  factory LiveNotificationItem.fromEventSub(EventSubOnlineEvent event) {
+    return LiveNotificationItem(
+      id: '${event.broadcasterId}-${event.startedAt.toIso8601String()}',
+      userId: event.broadcasterId,
+      userLogin: event.broadcasterLogin,
+      userName: event.broadcasterName,
+      title: 'Started streaming',
+      gameName: '',
+      wentLiveAt: event.startedAt,
+    );
+  }
 }
 
 class NotificationsInboxState {
@@ -88,12 +103,14 @@ class NotificationsInboxState {
     this.isLoading = false,
     this.error,
     this.lastPolledAt,
+    this.eventSubConnected = false,
   });
 
   final List<LiveNotificationItem> items;
   final bool isLoading;
   final String? error;
   final DateTime? lastPolledAt;
+  final bool eventSubConnected;
 
   int get unreadCount => items.where((e) => !e.read).length;
 
@@ -103,18 +120,19 @@ class NotificationsInboxState {
     String? error,
     bool clearError = false,
     DateTime? lastPolledAt,
+    bool? eventSubConnected,
   }) {
     return NotificationsInboxState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       lastPolledAt: lastPolledAt ?? this.lastPolledAt,
+      eventSubConnected: eventSubConnected ?? this.eventSubConnected,
     );
   }
 }
 
 /// Diffs currently live followed channels against the previous snapshot.
-/// Returns new "went live" items for IDs that were absent before.
 List<LiveNotificationItem> diffWentLive({
   required Set<String> previousLiveUserIds,
   required List<TwitchStream> currentLive,
@@ -138,6 +156,8 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
 
   Timer? _timer;
   var _bootstrapped = false;
+  EventSubLiveClient? _eventSub;
+  StreamSubscription<EventSubOnlineEvent>? _eventSubSub;
 
   SharedPreferences get _prefs => ref.read(sharedPreferencesProvider);
 
@@ -147,12 +167,29 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
     ref.onDispose(() {
       WidgetsBinding.instance.removeObserver(this);
       _timer?.cancel();
+      _eventSubSub?.cancel();
+      _eventSub?.dispose();
     });
 
     final items = _loadItems();
     Future.microtask(() async {
+      await ref.read(localPushServiceProvider).init();
       await refresh(force: true);
+      await _startEventSub();
       _startTimer();
+    });
+
+    ref.listen(authControllerProvider, (prev, next) {
+      final loggedIn = next.value?.isLoggedIn == true;
+      if (loggedIn) {
+        // ignore: discarded_futures
+        refresh(force: true);
+        // ignore: discarded_futures
+        _startEventSub();
+      } else {
+        // ignore: discarded_futures
+        _stopEventSub();
+      }
     });
 
     return NotificationsInboxState(items: items);
@@ -163,6 +200,8 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
     if (state == AppLifecycleState.resumed) {
       // ignore: discarded_futures
       refresh(force: true);
+      // ignore: discarded_futures
+      _startEventSub();
     }
   }
 
@@ -174,15 +213,65 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
     });
   }
 
+  Future<void> _startEventSub() async {
+    final auth = ref.read(authControllerProvider).value;
+    if (auth?.isLoggedIn != true || auth?.userId == null) return;
+    await _stopEventSub();
+    _eventSub = EventSubLiveClient(
+      helix: ref.read(helixRepositoryProvider),
+      dio: ref.read(dioProvider),
+    );
+    _eventSubSub = _eventSub!.onlineEvents.listen(_onEventSubOnline);
+    try {
+      await _eventSub!.start(userId: auth!.userId!);
+      state = state.copyWith(eventSubConnected: true);
+    } on Object {
+      state = state.copyWith(eventSubConnected: false);
+    }
+  }
+
+  Future<void> _stopEventSub() async {
+    await _eventSubSub?.cancel();
+    _eventSubSub = null;
+    await _eventSub?.dispose();
+    _eventSub = null;
+    state = state.copyWith(eventSubConnected: false);
+  }
+
+  Future<void> _onEventSubOnline(EventSubOnlineEvent event) async {
+    final item = LiveNotificationItem.fromEventSub(event);
+    await _ingestFresh([item], notify: true);
+    final snapshot = _loadLiveSnapshot()..add(event.broadcasterId);
+    await _saveLiveSnapshot(snapshot);
+  }
+
+  Future<void> _ingestFresh(
+    List<LiveNotificationItem> fresh, {
+    required bool notify,
+  }) async {
+    if (fresh.isEmpty) return;
+    final known = state.items.map((e) => e.id).toSet();
+    final novel = fresh.where((e) => !known.contains(e.id)).toList();
+    if (novel.isEmpty) return;
+    var nextItems = [...novel, ...state.items];
+    if (nextItems.length > 100) nextItems = nextItems.sublist(0, 100);
+    await _saveItems(nextItems);
+    state = state.copyWith(items: nextItems);
+    if (notify) {
+      final push = ref.read(localPushServiceProvider);
+      for (final item in novel) {
+        await push.showWentLive(item);
+      }
+    }
+  }
+
   List<LiveNotificationItem> _loadItems() {
     final raw = _prefs.getString(_itemsKey);
     if (raw == null || raw.isEmpty) return const [];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
       return list
-          .map(
-            (e) => LiveNotificationItem.fromJson(e as Map<String, dynamic>),
-          )
+          .map((e) => LiveNotificationItem.fromJson(e as Map<String, dynamic>))
           .toList();
     } on Object {
       return const [];
@@ -221,20 +310,13 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
       final knownIds = state.items.map((e) => e.id).toSet();
       final seeded = !_bootstrapped && previous.isEmpty;
 
-      List<LiveNotificationItem> nextItems = List.of(state.items);
       if (!seeded) {
         final fresh = diffWentLive(
           previousLiveUserIds: previous,
           currentLive: page.streams,
           knownNotificationIds: knownIds,
         );
-        if (fresh.isNotEmpty) {
-          nextItems = [...fresh, ...nextItems];
-          if (nextItems.length > 100) {
-            nextItems = nextItems.sublist(0, 100);
-          }
-          await _saveItems(nextItems);
-        }
+        await _ingestFresh(fresh, notify: true);
       }
 
       final liveIds = page.streams.map((e) => e.userId).toSet();
@@ -242,7 +324,6 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
       _bootstrapped = true;
 
       state = state.copyWith(
-        items: nextItems,
         isLoading: false,
         lastPolledAt: DateTime.now(),
         clearError: true,

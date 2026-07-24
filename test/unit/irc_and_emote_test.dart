@@ -38,6 +38,22 @@ void main() {
       ]);
     });
 
+    test('parses reply and bits tags', () {
+      const raw =
+          '@badges=;bits=100;color=#FF0000;display-name=Cheerer;'
+          'id=cheer-1;reply-parent-msg-id=parent-9;'
+          'reply-parent-display-name=Host;reply-parent-user-login=host;'
+          'reply-parent-msg-body=hello\\sthere '
+          ':cheerer!c@c.tmi.twitch.tv PRIVMSG #host :Cheer100 nice';
+      final message = const IrcMessageParser().toChatMessage(raw);
+      expect(message, isNotNull);
+      expect(message!.bits, 100);
+      expect(message.isCheer, isTrue);
+      expect(message.replyParent?.messageId, 'parent-9');
+      expect(message.replyParent?.displayName, 'Host');
+      expect(message.replyParent?.body, 'hello there');
+    });
+
     test('parses ACTION messages', () {
       const raw =
           '@display-name=Actor;color=;id=act-1 '

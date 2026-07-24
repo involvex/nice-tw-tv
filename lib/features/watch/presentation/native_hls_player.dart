@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -10,6 +12,8 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
     this.channelLogin,
     this.vodId,
     this.onFailed,
+    this.onQualities,
+    this.initialQuality,
   }) : assert(
          channelLogin != null || vodId != null,
          'Provide channelLogin or vodId',
@@ -17,9 +21,9 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
 
   final String? channelLogin;
   final String? vodId;
-
-  /// Called once when resolve/open fails so the host can fall back to embed.
   final ValueChanged<Object>? onFailed;
+  final ValueChanged<List<String>>? onQualities;
+  final String? initialQuality;
 
   @override
   ConsumerState<NativeHlsPlayer> createState() => NativeHlsPlayerState();
@@ -31,8 +35,11 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   String? _error;
   var _loading = true;
   var _failureReported = false;
+  HlsPlaylist? _playlist;
+  String _activeQuality = 'auto';
 
   Player get player => _player;
+  String get activeQuality => _activeQuality;
 
   @override
   void initState() {
@@ -59,10 +66,29 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
     });
     try {
       final resolver = ref.read(hlsResolverProvider);
-      final uri = widget.vodId != null
-          ? await resolver.resolveVod(widget.vodId!)
-          : await resolver.resolveLive(widget.channelLogin!);
-      await _player.open(Media(uri.toString()));
+      final playlist = widget.vodId != null
+          ? await resolver.resolveVodPlaylist(widget.vodId!)
+          : await resolver.resolveLivePlaylist(widget.channelLogin!);
+      _playlist = playlist;
+      final names = [
+        'auto',
+        ...playlist.variants
+            .where((v) => !v.isAudioOnly)
+            .map((v) => v.name)
+            .where((n) => n.toLowerCase() != 'auto'),
+      ];
+      widget.onQualities?.call(names);
+
+      final preferred = widget.initialQuality;
+      final target = preferred == null || preferred == 'auto'
+          ? null
+          : playlist.variants
+                .where((v) => v.name == preferred && !v.isAudioOnly)
+                .firstOrNull;
+      _activeQuality = target?.name ?? 'auto';
+      await _player.open(
+        Media((target?.url ?? playlist.masterUrl).toString()),
+      );
       if (mounted) setState(() => _loading = false);
     } on Object catch (e) {
       if (mounted) {
@@ -76,6 +102,23 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
         widget.onFailed?.call(e);
       }
     }
+  }
+
+  Future<void> setQuality(String quality) async {
+    final playlist = _playlist;
+    if (playlist == null) return;
+    if (quality == 'auto') {
+      _activeQuality = 'auto';
+      await _player.open(Media(playlist.masterUrl.toString()));
+      return;
+    }
+    final match = playlist.variants
+        .where((v) => v.name == quality && !v.isAudioOnly)
+        .firstOrNull;
+    if (match == null) return;
+    _activeQuality = match.name;
+    await _player.open(Media(match.url.toString()));
+    if (mounted) setState(() {});
   }
 
   Future<void> retry() => _open();

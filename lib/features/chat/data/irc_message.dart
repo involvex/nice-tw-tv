@@ -19,6 +19,20 @@ class ChatBadgeRef {
   }
 }
 
+class ChatReplyParent {
+  const ChatReplyParent({
+    required this.messageId,
+    required this.userLogin,
+    required this.displayName,
+    required this.body,
+  });
+
+  final String messageId;
+  final String userLogin;
+  final String displayName;
+  final String body;
+}
+
 class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -31,6 +45,8 @@ class ChatMessage {
     required this.timestamp,
     this.system = false,
     this.badges = const [],
+    this.bits,
+    this.replyParent,
   });
 
   final String id;
@@ -43,6 +59,12 @@ class ChatMessage {
   final DateTime timestamp;
   final bool system;
   final List<ChatBadgeRef> badges;
+
+  /// Bits cheered in this message, if any.
+  final int? bits;
+  final ChatReplyParent? replyParent;
+
+  bool get isCheer => bits != null && bits! > 0;
 
   factory ChatMessage.system(String text) {
     return ChatMessage(
@@ -134,6 +156,22 @@ class IrcMessageParser {
     final display = parsed.tags['display-name']?.isNotEmpty == true
         ? parsed.tags['display-name']!
         : login;
+    final bitsRaw = parsed.tags['bits'];
+    final bits = bitsRaw == null || bitsRaw.isEmpty
+        ? null
+        : int.tryParse(bitsRaw);
+
+    ChatReplyParent? reply;
+    final parentId = parsed.tags['reply-parent-msg-id'];
+    if (parentId != null && parentId.isNotEmpty) {
+      reply = ChatReplyParent(
+        messageId: parentId,
+        userLogin: parsed.tags['reply-parent-user-login'] ?? '',
+        displayName: parsed.tags['reply-parent-display-name'] ?? '',
+        body: parsed.tags['reply-parent-msg-body'] ?? '',
+      );
+    }
+
     return ChatMessage(
       id:
           parsed.tags['id'] ??
@@ -148,11 +186,14 @@ class IrcMessageParser {
       isAction: isAction,
       timestamp: DateTime.now(),
       badges: ChatBadgeRef.parse(parsed.tags['badges']),
+      bits: bits,
+      replyParent: reply,
     );
   }
 }
 
 /// Splits chat text into plain segments and emote names found in [catalog].
+/// Cheer tokens like `Cheer100` are kept as text (styled by the UI).
 List<ChatSegment> tokenizeMessage(String message, EmoteCatalog catalog) {
   final parts = message.split(' ');
   final segments = <ChatSegment>[];

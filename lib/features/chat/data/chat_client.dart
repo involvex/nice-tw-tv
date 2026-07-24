@@ -120,9 +120,14 @@ class TwitchIrcClient {
     _send('JOIN #${channelLogin.toLowerCase()}');
   }
 
-  void sendMessage(String text) {
+  void sendMessage(String text, {String? replyParentMsgId}) {
     if (text.trim().isEmpty) return;
-    _send('PRIVMSG #${channelLogin.toLowerCase()} :${text.trim()}');
+    final channel = channelLogin.toLowerCase();
+    if (replyParentMsgId != null && replyParentMsgId.isNotEmpty) {
+      _send('@reply-parent-msg-id=$replyParentMsgId PRIVMSG #$channel :${text.trim()}');
+    } else {
+      _send('PRIVMSG #$channel :${text.trim()}');
+    }
   }
 
   void _send(String line) {
@@ -318,7 +323,7 @@ class ChatController extends Notifier<ChatConnectionState> {
     await _reconnectNow();
   }
 
-  void send(String text) {
+  void send(String text, {String? replyParentMsgId, ChatReplyParent? replyEcho}) {
     if (!_loggedIn) {
       _appendSystem('Sign in to send chat messages.');
       return;
@@ -328,7 +333,7 @@ class ChatController extends Notifier<ChatConnectionState> {
       return;
     }
     final auth = ref.read(authControllerProvider).value!;
-    _client?.sendMessage(text);
+    _client?.sendMessage(text, replyParentMsgId: replyParentMsgId);
     state = _withSend(
       state.copyWith(
         messages: [
@@ -343,6 +348,7 @@ class ChatController extends Notifier<ChatConnectionState> {
             isAction: false,
             timestamp: DateTime.now(),
             badges: const [],
+            replyParent: replyEcho,
           ),
         ],
       ),

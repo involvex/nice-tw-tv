@@ -27,6 +27,7 @@ class WatchScreen extends ConsumerStatefulWidget {
 
 class _WatchScreenState extends ConsumerState<WatchScreen> {
   final _embedKey = GlobalKey<TwitchEmbedPlayerState>();
+  final _nativeKey = GlobalKey<NativeHlsPlayerState>();
   var _qualities = <String>['auto'];
   String? _activeQuality;
   var _pipSupported = false;
@@ -60,6 +61,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         .read(settingsControllerProvider.notifier)
         .setVideoQuality(quality);
     await _embedKey.currentState?.setQuality(quality);
+    await _nativeKey.currentState?.setQuality(quality);
   }
 
   Future<void> _saveProfile(StreamerLayoutProfile profile) async {
@@ -262,9 +264,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       aspectRatio: 16 / 9,
       child: useNative
           ? NativeHlsPlayer(
+              key: _nativeKey,
               channelLogin: widget.vodId == null ? widget.channelLogin : null,
               vodId: widget.vodId,
+              initialQuality: quality,
               onFailed: _onNativeFailed,
+              onQualities: (names) {
+                if (!mounted) return;
+                setState(() {
+                  _qualities = names;
+                  _activeQuality ??= quality;
+                });
+              },
             )
           : TwitchEmbedPlayer(
               key: _embedKey,
@@ -303,17 +314,16 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               onPressed: () => PipService.enter(),
               icon: const Icon(Icons.picture_in_picture_alt_outlined),
             ),
-          if (!useNative)
-            PopupMenuButton<String>(
-              tooltip: 'Quality',
-              initialValue: _activeQuality ?? quality,
-              onSelected: _setQuality,
-              itemBuilder: (context) => [
-                for (final q in _qualities)
-                  PopupMenuItem(value: q, child: Text(q)),
-              ],
-              icon: const Icon(Icons.high_quality_outlined),
-            ),
+          PopupMenuButton<String>(
+            tooltip: 'Quality',
+            initialValue: _activeQuality ?? quality,
+            onSelected: _setQuality,
+            itemBuilder: (context) => [
+              for (final q in _qualities)
+                PopupMenuItem(value: q, child: Text(q)),
+            ],
+            icon: const Icon(Icons.high_quality_outlined),
+          ),
           IconButton(
             tooltip: 'Layout profile',
             onPressed: _openLayoutSheet,
