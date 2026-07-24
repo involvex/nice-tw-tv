@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/chat/data/chat_client.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
 import 'package:nice_tv/features/emotes/data/emote.dart';
-import 'package:nice_tv/features/emotes/data/emote_repository.dart';
+import 'package:nice_tv/features/emotes/data/seventv_events.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 
 class ChatPanel extends ConsumerStatefulWidget {
@@ -12,10 +12,14 @@ class ChatPanel extends ConsumerStatefulWidget {
     super.key,
     required this.channelLogin,
     required this.broadcasterId,
+    this.densityOverride,
   });
 
   final String channelLogin;
   final String? broadcasterId;
+
+  /// When set, overrides global chat density for this panel.
+  final int? densityOverride;
 
   @override
   ConsumerState<ChatPanel> createState() => _ChatPanelState();
@@ -48,7 +52,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
 
   void _onInputChanged() {
     final catalog = ref
-        .read(channelEmotesProvider(widget.broadcasterId ?? ''))
+        .read(channelEmotesControllerProvider(widget.broadcasterId ?? ''))
         .value;
     if (catalog == null) {
       setState(() => _suggestions = []);
@@ -89,11 +93,11 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   Widget build(BuildContext context) {
     final chat = ref.watch(chatControllerProvider);
     final emotesAsync = ref.watch(
-      channelEmotesProvider(widget.broadcasterId ?? ''),
+      channelEmotesControllerProvider(widget.broadcasterId ?? ''),
     );
-    final density = ref.watch(
-      settingsControllerProvider.select((s) => s.chatDensity),
-    );
+    final density =
+        widget.densityOverride ??
+        ref.watch(settingsControllerProvider.select((s) => s.chatDensity));
     final pad = switch (density) {
       0 => 4.0,
       2 => 10.0,

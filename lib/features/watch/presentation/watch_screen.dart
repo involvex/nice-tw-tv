@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/chat/presentation/chat_panel.dart';
+import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:nice_tv/features/watch/data/pip_service.dart';
+import 'package:nice_tv/features/watch/presentation/native_hls_player.dart';
+import 'package:nice_tv/features/watch/presentation/twitch_embed_player.dart';
 
 class WatchScreen extends ConsumerStatefulWidget {
   const WatchScreen({
@@ -10,52 +13,215 @@ class WatchScreen extends ConsumerStatefulWidget {
     required this.channelLogin,
     this.title,
     this.broadcasterId,
+    this.vodId,
   });
 
   final String channelLogin;
   final String? title;
   final String? broadcasterId;
+  final String? vodId;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
 }
 
 class _WatchScreenState extends ConsumerState<WatchScreen> {
-  late final WebViewController _player;
-  var _chatExpanded = true;
+  final _embedKey = GlobalKey<TwitchEmbedPlayerState>();
+  var _qualities = <String>['auto'];
+  String? _activeQuality;
+  var _pipSupported = false;
 
   @override
   void initState() {
     super.initState();
-    _player = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF000000));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPlayer());
+    // ignore: discarded_futures
+    PipService.isSupported().then((value) {
+      if (mounted) setState(() => _pipSupported = value);
+    });
   }
 
-  void _loadPlayer() {
-    final quality = ref.read(settingsControllerProvider).videoQuality;
-    final uri = Uri.https('player.twitch.tv', '/', {
-      'channel': widget.channelLogin,
-      'parent': 'twitch.tv',
-      'muted': 'false',
-      if (quality != 'auto') 'quality': quality,
-    });
-    _player.loadRequest(uri);
+  StreamerLayoutProfile get _profile => ref
+      .read(layoutProfilesControllerProvider.notifier)
+      .forChannel(widget.channelLogin);
+
+  String get _quality {
+    return _profile.preferredQuality ??
+        ref.read(settingsControllerProvider).videoQuality;
   }
 
   Future<void> _setQuality(String quality) async {
+    setState(() => _activeQuality = quality);
+    final profile = _profile.copyWith(preferredQuality: quality);
+    await ref
+        .read(layoutProfilesControllerProvider.notifier)
+        .save(widget.channelLogin, profile);
     await ref
         .read(settingsControllerProvider.notifier)
         .setVideoQuality(quality);
-    await _player.runJavaScript('''
-      (function() {
-        try {
-          var buttons = Array.from(document.querySelectorAll('button, div[role="button"]'));
-        } catch (e) {}
-      })();
-    ''');
-    _loadPlayer();
+    await _embedKey.currentState?.setQuality(quality);
+  }
+
+  Future<void> _saveProfile(StreamerLayoutProfile profile) async {
+    await ref
+        .read(layoutProfilesControllerProvider.notifier)
+        .save(widget.channelLogin, profile);
+  }
+
+  void _onPlayerEvent(TwitchPlayerEvent event) {
+    if (event.qualities.isNotEmpty) {
+      setState(() {
+        _qualities = {
+          'auto',
+          ...event.qualities.where((q) => q.isNotEmpty && q != 'Auto'),
+        }.toList();
+      });
+    }
+    if (event.quality != null && event.quality!.isNotEmpty) {
+      setState(() => _activeQuality = event.quality);
+    }
+  }
+
+  Future<void> _openLayoutSheet() async {
+    final profile = ref
+        .read(layoutProfilesControllerProvider.notifier)
+        .forChannel(widget.channelLogin);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        var draft = profile;
+        return StatefulBuilder(
+          builder: (context, setModal) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Layout for ${widget.channelLogin}',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Chat placement',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<ChatPlacement>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ChatPlacement.bottom,
+                        label: Text('Bottom'),
+                        icon: Icon(Icons.vertical_align_bottom),
+                      ),
+                      ButtonSegment(
+                        value: ChatPlacement.side,
+                        label: Text('Side'),
+                        icon: Icon(Icons.view_sidebar_outlined),
+                      ),
+                      ButtonSegment(
+                        value: ChatPlacement.hidden,
+                        label: Text('Hidden'),
+                        icon: Icon(Icons.visibility_off_outlined),
+                      ),
+                    ],
+                    selected: {draft.chatPlacement},
+                    onSelectionChanged: (set) {
+                      setModal(() {
+                        draft = draft.copyWith(chatPlacement: set.first);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Chat density'),
+                    trailing: DropdownButton<int>(
+                      value: draft.chatDensity ?? -1,
+                      items: const [
+                        DropdownMenuItem(value: -1, child: Text('Global')),
+                        DropdownMenuItem(value: 0, child: Text('Compact')),
+                        DropdownMenuItem(value: 1, child: Text('Default')),
+                        DropdownMenuItem(value: 2, child: Text('Spacious')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setModal(() {
+                          draft = value < 0
+                              ? draft.copyWith(clearChatDensity: true)
+                              : draft.copyWith(chatDensity: value);
+                        });
+                      },
+                    ),
+                  ),
+                  Text(
+                    'Split ratio (${(draft.videoChatRatio * 100).round()}% video)',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  Slider(
+                    value: draft.videoChatRatio.clamp(0.4, 0.8),
+                    min: 0.4,
+                    max: 0.8,
+                    onChanged: (value) {
+                      setModal(() {
+                        draft = draft.copyWith(videoChatRatio: value);
+                      });
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Player'),
+                    trailing: DropdownButton<String>(
+                      value: draft.playerBackend?.name ?? 'global',
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'global',
+                          child: Text('Global'),
+                        ),
+                        DropdownMenuItem(value: 'embed', child: Text('Embed')),
+                        DropdownMenuItem(
+                          value: 'nativeHls',
+                          child: Text('Native HLS'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setModal(() {
+                          if (value == 'global') {
+                            draft = draft.copyWith(clearPlayerBackend: true);
+                          } else if (value == 'embed') {
+                            draft = draft.copyWith(
+                              playerBackend: PlayerBackend.embed,
+                            );
+                          } else {
+                            draft = draft.copyWith(
+                              playerBackend: PlayerBackend.nativeHls,
+                            );
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      await _saveProfile(draft);
+                      if (context.mounted) Navigator.pop(context);
+                      setState(() {});
+                    },
+                    child: const Text('Save profile'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    setState(() {});
   }
 
   @override
@@ -63,15 +229,40 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     final theme = Theme.of(context);
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
+    final profiles = ref.watch(layoutProfilesControllerProvider);
+    final profile =
+        profiles[widget.channelLogin.toLowerCase()] ??
+        const StreamerLayoutProfile();
+    final globalBackend = ref.watch(playerBackendControllerProvider);
+    final backend = profile.playerBackend ?? globalBackend;
+    final quality = profile.preferredQuality ?? _quality;
+    final showChat = profile.chatPlacement != ChatPlacement.hidden;
+    final forceSide =
+        profile.chatPlacement == ChatPlacement.side ||
+        (profile.chatPlacement == ChatPlacement.bottom && isLandscape);
+    final videoFlex = (profile.videoChatRatio * 10).round().clamp(4, 8);
+    final chatFlex = (10 - videoFlex).clamp(2, 6);
 
     final player = AspectRatio(
       aspectRatio: 16 / 9,
-      child: WebViewWidget(controller: _player),
+      child: backend == PlayerBackend.nativeHls
+          ? NativeHlsPlayer(
+              channelLogin: widget.vodId == null ? widget.channelLogin : null,
+              vodId: widget.vodId,
+            )
+          : TwitchEmbedPlayer(
+              key: _embedKey,
+              channelLogin: widget.vodId == null ? widget.channelLogin : null,
+              vodId: widget.vodId,
+              initialQuality: quality,
+              onEvent: _onPlayerEvent,
+            ),
     );
 
     final chat = ChatPanel(
       channelLogin: widget.channelLogin,
       broadcasterId: widget.broadcasterId,
+      densityOverride: profile.chatDensity,
     );
 
     return Scaffold(
@@ -79,7 +270,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.channelLogin),
+            Text(widget.vodId != null ? 'VOD' : widget.channelLogin),
             if (widget.title != null)
               Text(
                 widget.title!,
@@ -90,50 +281,63 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           ],
         ),
         actions: [
+          if (_pipSupported)
+            IconButton(
+              tooltip: 'Picture in picture',
+              onPressed: () => PipService.enter(),
+              icon: const Icon(Icons.picture_in_picture_alt_outlined),
+            ),
           PopupMenuButton<String>(
             tooltip: 'Quality',
+            initialValue: _activeQuality ?? quality,
             onSelected: _setQuality,
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'auto', child: Text('Auto')),
-              PopupMenuItem(value: '160p', child: Text('160p')),
-              PopupMenuItem(value: '360p', child: Text('360p')),
-              PopupMenuItem(value: '480p', child: Text('480p')),
-              PopupMenuItem(value: '720p', child: Text('720p')),
-              PopupMenuItem(value: '1080p', child: Text('1080p')),
+            itemBuilder: (context) => [
+              for (final q in _qualities)
+                PopupMenuItem(value: q, child: Text(q)),
             ],
             icon: const Icon(Icons.high_quality_outlined),
           ),
           IconButton(
-            tooltip: _chatExpanded ? 'Hide chat' : 'Show chat',
-            onPressed: () => setState(() => _chatExpanded = !_chatExpanded),
+            tooltip: 'Layout profile',
+            onPressed: _openLayoutSheet,
+            icon: const Icon(Icons.dashboard_customize_outlined),
+          ),
+          IconButton(
+            tooltip: showChat ? 'Hide chat' : 'Show chat',
+            onPressed: () async {
+              final next = showChat
+                  ? ChatPlacement.hidden
+                  : (isLandscape ? ChatPlacement.side : ChatPlacement.bottom);
+              await _saveProfile(profile.copyWith(chatPlacement: next));
+              setState(() {});
+            },
             icon: Icon(
-              _chatExpanded ? Icons.chat_bubble : Icons.chat_bubble_outline,
+              showChat ? Icons.chat_bubble : Icons.chat_bubble_outline,
             ),
           ),
         ],
       ),
-      body: isLandscape
+      body: forceSide && showChat
           ? Row(
               children: [
-                Expanded(flex: 3, child: player),
-                if (_chatExpanded)
-                  Expanded(
-                    flex: 2,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: theme.dividerColor),
-                        ),
+                Expanded(flex: videoFlex, child: player),
+                Expanded(
+                  flex: chatFlex,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(color: theme.dividerColor),
                       ),
-                      child: chat,
                     ),
+                    child: chat,
                   ),
+                ),
               ],
             )
           : Column(
               children: [
                 player,
-                if (_chatExpanded) Expanded(child: chat),
+                if (showChat) Expanded(child: chat),
               ],
             ),
     );

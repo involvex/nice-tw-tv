@@ -2,11 +2,15 @@
 
 Modern Android-first Twitch client built with Flutter. Clean-room implementation inspired by the architecture of third-party clients like Frosty — not a fork.
 
-## Features (MVP)
+## Features (MVP + v1.1)
 
 - Twitch frontpage: popular live streams + following feed with infinite scroll
-- Live watch via Twitch WebView embed + chat/video split in landscape
+- VOD shelf from popular channels’ recent archives
+- Live/VOD watch via Twitch embed JS bridge **or** experimental native HLS
+- Android Picture-in-Picture
+- Per-streamer layout profiles (chat placement, density, split ratio, player)
 - IRC chat with Twitch, BetterTTV, FrankerFaceZ, and 7TV emotes
+- Live 7TV emote-set websocket updates
 - Emote autocomplete and picker
 - Light / dark / system themes with accent customization
 - Chat density and default stream quality settings

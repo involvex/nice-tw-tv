@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <style>
+    html, body, #player {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <script src="https://embed.twitch.tv/embed/v1.js"></script>
+  <script>
+    (function () {
+      const cfg = window.NiceTvConfig || {};
+      const channel = cfg.channel || null;
+      const video = cfg.video || null;
+      const quality = cfg.quality || '';
+
+      function post(msg) {
+        try {
+          if (window.NiceTvPlayer && NiceTvPlayer.postMessage) {
+            NiceTvPlayer.postMessage(JSON.stringify(msg));
+          }
+        } catch (e) {}
+      }
+
+      function qualityNames(list) {
+        if (!list || !list.length) return [];
+        return list.map(function (q) {
+          return q.name || q.group || String(q);
+        });
+      }
+
+      const opts = {
+        width: '100%',
+        height: '100%',
+        parent: ['twitch.tv'],
+        autoplay: true,
+        muted: false,
+      };
+      if (channel) opts.channel = channel;
+      if (video) opts.video = video;
+
+      const player = new Twitch.Player('player', opts);
+
+      player.addEventListener(Twitch.Player.READY, function () {
+        const qualities = qualityNames(player.getQualities());
+        post({ type: 'ready', qualities: qualities, quality: player.getQuality() });
+        if (quality && quality !== 'auto') {
+          try { player.setQuality(quality); } catch (e) {}
+        }
+      });
+
+      player.addEventListener(Twitch.Player.PLAYING, function () {
+        post({
+          type: 'playing',
+          quality: player.getQuality(),
+          qualities: qualityNames(player.getQualities()),
+        });
+      });
+
+      window.NiceTvSetQuality = function (q) {
+        try {
+          if (!q || q === 'auto') {
+            player.setQuality('auto');
+          } else {
+            player.setQuality(q);
+          }
+          post({
+            type: 'quality',
+            quality: player.getQuality(),
+            qualities: qualityNames(player.getQualities()),
+          });
+        } catch (e) {
+          post({ type: 'error', message: String(e) });
+        }
+      };
+
+      window.NiceTvGetQualities = function () {
+        post({
+          type: 'qualities',
+          qualities: qualityNames(player.getQualities()),
+          quality: player.getQuality(),
+        });
+      };
+
+      window.NiceTvPause = function () { try { player.pause(); } catch (e) {} };
+      window.NiceTvPlay = function () { try { player.play(); } catch (e) {} };
+    })();
+  </script>
+</body>
+</html>

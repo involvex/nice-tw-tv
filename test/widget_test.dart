@@ -48,6 +48,7 @@ void main() {
     await tester.pump();
     expect(find.text('Nice TV'), findsWidgets);
     expect(find.text('Live'), findsOneWidget);
+    expect(find.text('VODs'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
   });
 }

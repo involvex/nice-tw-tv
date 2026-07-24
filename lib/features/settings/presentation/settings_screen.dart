@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -136,10 +137,38 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+          const SizedBox(height: 8),
+          Text('Player backend', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Consumer(
+            builder: (context, ref, _) {
+              final backend = ref.watch(playerBackendControllerProvider);
+              return SegmentedButton<PlayerBackend>(
+                segments: const [
+                  ButtonSegment(
+                    value: PlayerBackend.embed,
+                    label: Text('Embed'),
+                    icon: Icon(Icons.web_asset),
+                  ),
+                  ButtonSegment(
+                    value: PlayerBackend.nativeHls,
+                    label: Text('Native HLS'),
+                    icon: Icon(Icons.play_circle_outline),
+                  ),
+                ],
+                selected: {backend},
+                onSelectionChanged: (set) {
+                  ref
+                      .read(playerBackendControllerProvider.notifier)
+                      .setBackend(set.first);
+                },
+              );
+            },
+          ),
           const SizedBox(height: 16),
           Text(
-            'Layout profiles per streamer land in v1.1. '
-            'Chat/video split already adapts in landscape on the watch screen.',
+            'Native HLS is experimental (GQL/Usher). '
+            'Per-streamer layout profiles are edited from the watch screen customize button.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

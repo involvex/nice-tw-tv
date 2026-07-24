@@ -4,6 +4,7 @@ import 'package:nice_tv/core/env/app_env.dart';
 import 'package:nice_tv/core/network/dio_providers.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/vod/data/twitch_vod.dart';
 
 final helixDioProvider = Provider<Dio>((ref) {
   final base = ref.watch(dioProvider);
@@ -78,6 +79,62 @@ class HelixRepository {
       );
     }).toList();
     return StreamsPage(streams: streams);
+  }
+
+  Future<VodsPage> getVideos({
+    String? userId,
+    String? cursor,
+    int first = 20,
+    String type = 'archive',
+    String sort = 'time',
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/videos',
+      queryParameters: {
+        'user_id': ?userId,
+        'first': first,
+        'type': type,
+        'sort': sort,
+        if (cursor != null && cursor.isNotEmpty) 'after': cursor,
+      },
+    );
+    return _parseVodsPage(response.data!);
+  }
+
+  Future<VodsPage> getTopArchiveVideos({String? cursor, int first = 20}) async {
+    // Helix requires user_id/game_id/id — use followed live channels' recent
+    // VODs is not available anonymously. Fall back to language-filtered search
+    // via games top + videos is heavy; instead fetch videos for currently
+    // popular live streamers as a pragmatic "recent VODs" shelf.
+    final live = await getTopStreams(first: 8);
+    if (live.streams.isEmpty) return const VodsPage(vods: []);
+    final pages = <VodsPage>[];
+    for (final stream in live.streams) {
+      try {
+        pages.add(await getVideos(userId: stream.userId, first: 3));
+      } on Object {
+        pages.add(const VodsPage(vods: []));
+      }
+    }
+    final vods = <TwitchVod>[];
+    final seen = <String>{};
+    for (final page in pages) {
+      for (final vod in page.vods) {
+        if (seen.add(vod.id)) vods.add(vod);
+      }
+    }
+    vods.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return VodsPage(vods: vods);
+  }
+
+  VodsPage _parseVodsPage(Map<String, dynamic> body) {
+    final data = body['data'] as List<dynamic>? ?? [];
+    final pagination = body['pagination'] as Map<String, dynamic>?;
+    final cursor = pagination?['cursor'] as String?;
+    final vods = data
+        .map((e) => TwitchVod.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return VodsPage(vods: vods, cursor: cursor);
   }
 
   StreamsPage _parseStreamsPage(Map<String, dynamic> body) {
