@@ -124,7 +124,9 @@ class TwitchIrcClient {
     if (text.trim().isEmpty) return;
     final channel = channelLogin.toLowerCase();
     if (replyParentMsgId != null && replyParentMsgId.isNotEmpty) {
-      _send('@reply-parent-msg-id=$replyParentMsgId PRIVMSG #$channel :${text.trim()}');
+      _send(
+        '@reply-parent-msg-id=$replyParentMsgId PRIVMSG #$channel :${text.trim()}',
+      );
     } else {
       _send('PRIVMSG #$channel :${text.trim()}');
     }
@@ -323,7 +325,11 @@ class ChatController extends Notifier<ChatConnectionState> {
     await _reconnectNow();
   }
 
-  void send(String text, {String? replyParentMsgId, ChatReplyParent? replyEcho}) {
+  void send(
+    String text, {
+    String? replyParentMsgId,
+    ChatReplyParent? replyEcho,
+  }) {
     if (!_loggedIn) {
       _appendSystem('Sign in to send chat messages.');
       return;

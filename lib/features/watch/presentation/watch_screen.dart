@@ -14,12 +14,14 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.title,
     this.broadcasterId,
     this.vodId,
+    this.clipId,
   });
 
   final String channelLogin;
   final String? title;
   final String? broadcasterId;
   final String? vodId;
+  final String? clipId;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -250,10 +252,14 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         const StreamerLayoutProfile();
     final globalBackend = ref.watch(playerBackendControllerProvider);
     final preferredBackend = profile.playerBackend ?? globalBackend;
+    final isClip = widget.clipId != null;
     final useNative =
-        preferredBackend == PlayerBackend.nativeHls && !_forceEmbedFallback;
+        !isClip &&
+        preferredBackend == PlayerBackend.nativeHls &&
+        !_forceEmbedFallback;
     final quality = profile.preferredQuality ?? _quality;
-    final showChat = profile.chatPlacement != ChatPlacement.hidden;
+    final showChat =
+        !isClip && profile.chatPlacement != ChatPlacement.hidden;
     final forceSide =
         profile.chatPlacement == ChatPlacement.side ||
         (profile.chatPlacement == ChatPlacement.bottom && isLandscape);
@@ -279,8 +285,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
             )
           : TwitchEmbedPlayer(
               key: _embedKey,
-              channelLogin: widget.vodId == null ? widget.channelLogin : null,
+              channelLogin: isClip || widget.vodId != null
+                  ? null
+                  : widget.channelLogin,
               vodId: widget.vodId,
+              clipId: widget.clipId,
               initialQuality: quality,
               onEvent: _onPlayerEvent,
             ),
@@ -297,7 +306,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.vodId != null ? 'VOD' : widget.channelLogin),
+            Text(
+              widget.clipId != null
+                  ? 'Clip'
+                  : widget.vodId != null
+                  ? 'VOD'
+                  : widget.channelLogin,
+            ),
             if (widget.title != null)
               Text(
                 widget.title!,

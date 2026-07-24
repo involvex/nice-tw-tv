@@ -17,8 +17,7 @@ class HlsVariant {
   final int? height;
   final int? bandwidth;
 
-  bool get isAudioOnly =>
-      name.toLowerCase().contains('audio') || height == 0;
+  bool get isAudioOnly => name.toLowerCase().contains('audio') || height == 0;
 }
 
 class HlsPlaylist {

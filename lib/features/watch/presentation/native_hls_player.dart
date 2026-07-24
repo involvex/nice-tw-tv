@@ -86,9 +86,7 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
                 .where((v) => v.name == preferred && !v.isAudioOnly)
                 .firstOrNull;
       _activeQuality = target?.name ?? 'auto';
-      await _player.open(
-        Media((target?.url ?? playlist.masterUrl).toString()),
-      );
+      await _player.open(Media((target?.url ?? playlist.masterUrl).toString()));
       if (mounted) setState(() => _loading = false);
     } on Object catch (e) {
       if (mounted) {

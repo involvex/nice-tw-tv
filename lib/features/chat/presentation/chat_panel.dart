@@ -128,8 +128,8 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   Color _statusColor(ChatLinkStatus status, ColorScheme scheme) {
     return switch (status) {
       ChatLinkStatus.connected => scheme.primary,
-      ChatLinkStatus.connecting || ChatLinkStatus.reconnecting =>
-        scheme.tertiary,
+      ChatLinkStatus.connecting ||
+      ChatLinkStatus.reconnecting => scheme.tertiary,
       ChatLinkStatus.disconnected => scheme.error,
     };
   }

@@ -36,15 +36,17 @@ class TwitchEmbedPlayer extends StatefulWidget {
     super.key,
     this.channelLogin,
     this.vodId,
+    this.clipId,
     this.initialQuality = 'auto',
     this.onEvent,
   }) : assert(
-         channelLogin != null || vodId != null,
-         'Provide channelLogin or vodId',
+         channelLogin != null || vodId != null || clipId != null,
+         'Provide channelLogin, vodId, or clipId',
        );
 
   final String? channelLogin;
   final String? vodId;
+  final String? clipId;
   final String initialQuality;
   final ValueChanged<TwitchPlayerEvent>? onEvent;
 
@@ -90,7 +92,8 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
   void didUpdateWidget(covariant TwitchEmbedPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.channelLogin != widget.channelLogin ||
-        oldWidget.vodId != widget.vodId) {
+        oldWidget.vodId != widget.vodId ||
+        oldWidget.clipId != widget.clipId) {
       _ready = false;
       final controller = _controller;
       if (controller != null) {
@@ -105,6 +108,7 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     final config = <String, dynamic>{
       if (widget.channelLogin != null) 'channel': widget.channelLogin,
       if (widget.vodId != null) 'video': widget.vodId,
+      if (widget.clipId != null) 'clip': widget.clipId,
       'quality': widget.initialQuality,
     };
     final html = template.replaceFirst(

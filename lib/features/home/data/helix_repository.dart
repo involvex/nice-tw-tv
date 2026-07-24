@@ -4,6 +4,7 @@ import 'package:nice_tv/core/env/app_env.dart';
 import 'package:nice_tv/core/network/dio_providers.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/chat/data/badge_catalog.dart';
+import 'package:nice_tv/features/home/data/twitch_clip.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
@@ -287,6 +288,56 @@ class HelixRepository {
     return VodsPage(vods: vods);
   }
 
+  Future<ClipsPage> getClips({
+    String? gameId,
+    String? broadcasterId,
+    String? cursor,
+    int first = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/clips',
+      queryParameters: {
+        'first': first,
+        'game_id': ?gameId,
+        'broadcaster_id': ?broadcasterId,
+        if (cursor != null && cursor.isNotEmpty) 'after': cursor,
+      },
+    );
+    return _parseClipsPage(response.data!);
+  }
+
+  /// Popular clips across top categories when no game filter is selected.
+  Future<ClipsPage> getPopularClips({int first = 40}) async {
+    final games = await getTopGames(first: 6);
+    final pages = <ClipsPage>[];
+    for (final game in games) {
+      try {
+        pages.add(await getClips(gameId: game.id, first: 8));
+      } on Object {
+        pages.add(const ClipsPage(clips: []));
+      }
+    }
+    final clips = <TwitchClip>[];
+    final seen = <String>{};
+    for (final page in pages) {
+      for (final clip in page.clips) {
+        if (seen.add(clip.id)) clips.add(clip);
+      }
+    }
+    clips.sort((a, b) => b.viewCount.compareTo(a.viewCount));
+    return ClipsPage(clips: clips.take(first).toList());
+  }
+
+  ClipsPage _parseClipsPage(Map<String, dynamic> body) {
+    final data = body['data'] as List<dynamic>? ?? [];
+    final pagination = body['pagination'] as Map<String, dynamic>?;
+    final cursor = pagination?['cursor'] as String?;
+    final clips = data
+        .map((e) => TwitchClip.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return ClipsPage(clips: clips, cursor: cursor);
+  }
+
   VodsPage _parseVodsPage(Map<String, dynamic> body) {
     final data = body['data'] as List<dynamic>? ?? [];
     final pagination = body['pagination'] as Map<String, dynamic>?;
@@ -311,6 +362,44 @@ class HelixRepository {
 final helixRepositoryProvider = Provider<HelixRepository>((ref) {
   return HelixRepository(ref.watch(helixDioProvider));
 });
+
+/// Pinned categories that should always appear in the Live/Clips chip row.
+const pinnedBrowseCategories = <TwitchCategory>[
+  TwitchCategory(
+    id: '509658',
+    name: 'Just Chatting',
+    boxArtUrl: '',
+  ),
+  TwitchCategory(id: '509670', name: 'IRL', boxArtUrl: ''),
+];
+
+final homeCategoryFilterProvider =
+    NotifierProvider<HomeCategoryFilterController, TwitchCategory?>(
+      HomeCategoryFilterController.new,
+    );
+
+class HomeCategoryFilterController extends Notifier<TwitchCategory?> {
+  @override
+  TwitchCategory? build() => null;
+
+  void select(TwitchCategory? category) => state = category;
+}
+
+final browseCategoriesProvider =
+    FutureProvider<List<TwitchCategory>>((ref) async {
+      final top = await ref.watch(helixRepositoryProvider).getTopGames(first: 16);
+      final byId = <String, TwitchCategory>{
+        for (final c in pinnedBrowseCategories) c.id: c,
+        for (final c in top) c.id: c,
+      };
+      final pinned = [
+        for (final p in pinnedBrowseCategories) byId[p.id]!,
+      ];
+      final rest = top.where(
+        (c) => !pinnedBrowseCategories.any((p) => p.id == c.id),
+      );
+      return [...pinned, ...rest];
+    });
 
 class StreamFeedState {
   const StreamFeedState({
@@ -349,6 +438,10 @@ class StreamFeedState {
 class PopularFeedController extends Notifier<StreamFeedState> {
   @override
   StreamFeedState build() {
+    ref.listen(homeCategoryFilterProvider, (_, _) {
+      // ignore: discarded_futures
+      refresh();
+    });
     Future.microtask(refresh);
     return const StreamFeedState(isLoading: true);
   }
@@ -360,7 +453,12 @@ class PopularFeedController extends Notifier<StreamFeedState> {
       clearCursor: true,
     );
     try {
-      final page = await ref.read(helixRepositoryProvider).getTopStreams();
+      final category = ref.read(homeCategoryFilterProvider);
+      final page = category == null
+          ? await ref.read(helixRepositoryProvider).getTopStreams()
+          : await ref
+                .read(helixRepositoryProvider)
+                .getStreamsByGame(gameId: category.id);
       state = state.copyWith(
         streams: page.streams,
         cursor: page.cursor,
@@ -376,9 +474,14 @@ class PopularFeedController extends Notifier<StreamFeedState> {
     if (state.isLoadingMore || state.isLoading || state.cursor == null) return;
     state = state.copyWith(isLoadingMore: true);
     try {
-      final page = await ref
-          .read(helixRepositoryProvider)
-          .getTopStreams(cursor: state.cursor);
+      final category = ref.read(homeCategoryFilterProvider);
+      final page = category == null
+          ? await ref
+                .read(helixRepositoryProvider)
+                .getTopStreams(cursor: state.cursor)
+          : await ref
+                .read(helixRepositoryProvider)
+                .getStreamsByGame(gameId: category.id, cursor: state.cursor);
       state = state.copyWith(
         streams: [...state.streams, ...page.streams],
         cursor: page.cursor,
@@ -451,4 +554,99 @@ class FollowingFeedController extends Notifier<StreamFeedState> {
 final followingFeedControllerProvider =
     NotifierProvider<FollowingFeedController, StreamFeedState>(
       FollowingFeedController.new,
+    );
+
+class ClipsFeedState {
+  const ClipsFeedState({
+    this.clips = const [],
+    this.cursor,
+    this.isLoading = false,
+    this.isLoadingMore = false,
+    this.error,
+  });
+
+  final List<TwitchClip> clips;
+  final String? cursor;
+  final bool isLoading;
+  final bool isLoadingMore;
+  final String? error;
+
+  ClipsFeedState copyWith({
+    List<TwitchClip>? clips,
+    String? cursor,
+    bool clearCursor = false,
+    bool? isLoading,
+    bool? isLoadingMore,
+    String? error,
+    bool clearError = false,
+  }) {
+    return ClipsFeedState(
+      clips: clips ?? this.clips,
+      cursor: clearCursor ? null : (cursor ?? this.cursor),
+      isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+class ClipsFeedController extends Notifier<ClipsFeedState> {
+  @override
+  ClipsFeedState build() {
+    ref.listen(homeCategoryFilterProvider, (_, _) {
+      // ignore: discarded_futures
+      refresh();
+    });
+    Future.microtask(refresh);
+    return const ClipsFeedState(isLoading: true);
+  }
+
+  Future<void> refresh() async {
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearCursor: true,
+    );
+    try {
+      final category = ref.read(homeCategoryFilterProvider);
+      final page = category == null
+          ? await ref.read(helixRepositoryProvider).getPopularClips()
+          : await ref
+                .read(helixRepositoryProvider)
+                .getClips(gameId: category.id);
+      state = state.copyWith(
+        clips: page.clips,
+        cursor: page.cursor,
+        isLoading: false,
+        clearError: true,
+      );
+    } on Object catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> loadMore() async {
+    final category = ref.read(homeCategoryFilterProvider);
+    // Aggregated "All" feed has no Helix cursor.
+    if (category == null) return;
+    if (state.isLoadingMore || state.isLoading || state.cursor == null) return;
+    state = state.copyWith(isLoadingMore: true);
+    try {
+      final page = await ref
+          .read(helixRepositoryProvider)
+          .getClips(gameId: category.id, cursor: state.cursor);
+      state = state.copyWith(
+        clips: [...state.clips, ...page.clips],
+        cursor: page.cursor,
+        isLoadingMore: false,
+      );
+    } on Object catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
+    }
+  }
+}
+
+final clipsFeedControllerProvider =
+    NotifierProvider<ClipsFeedController, ClipsFeedState>(
+      ClipsFeedController.new,
     );

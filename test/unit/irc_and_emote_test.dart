@@ -153,10 +153,9 @@ void main() {
           ),
         },
       );
-      expect(
-        catalog.filter(provider: EmoteProvider.bttv).map((e) => e.name),
-        ['Pog'],
-      );
+      expect(catalog.filter(provider: EmoteProvider.bttv).map((e) => e.name), [
+        'Pog',
+      ]);
       expect(catalog.filter(query: 'ka').map((e) => e.name), ['Kappa']);
     });
   });
@@ -209,15 +208,18 @@ void main() {
       expect(fresh, isEmpty);
     });
 
-    test('first snapshot with empty previous still reports when not seeded', () {
-      // Controller seeds first poll; pure diff still reports all as new.
-      final fresh = diffWentLive(
-        previousLiveUserIds: {},
-        currentLive: [stream(userId: 'c')],
-        knownNotificationIds: {},
-      );
-      expect(fresh.length, 1);
-    });
+    test(
+      'first snapshot with empty previous still reports when not seeded',
+      () {
+        // Controller seeds first poll; pure diff still reports all as new.
+        final fresh = diffWentLive(
+          previousLiveUserIds: {},
+          currentLive: [stream(userId: 'c')],
+          knownNotificationIds: {},
+        );
+        expect(fresh.length, 1);
+      },
+    );
   });
 
   group('ChatBadgeRef', () {

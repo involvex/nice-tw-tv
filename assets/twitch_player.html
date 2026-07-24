@@ -22,6 +22,7 @@
       const cfg = window.NiceTvConfig || {};
       const channel = cfg.channel || null;
       const video = cfg.video || null;
+      const clip = cfg.clip || null;
       const quality = cfg.quality || '';
 
       function post(msg) {
@@ -37,6 +38,29 @@
         return list.map(function (q) {
           return q.name || q.group || String(q);
         });
+      }
+
+      if (clip) {
+        // Clips use Twitch.Embed (Player does not accept clip IDs).
+        const embed = new Twitch.Embed('player', {
+          width: '100%',
+          height: '100%',
+          parent: ['twitch.tv'],
+          layout: 'video',
+          autoplay: true,
+          muted: false,
+          clip: clip,
+        });
+        embed.addEventListener(Twitch.Embed.VIDEO_READY, function () {
+          post({ type: 'ready', qualities: ['auto'], quality: 'auto' });
+        });
+        window.NiceTvSetQuality = function () {};
+        window.NiceTvGetQualities = function () {
+          post({ type: 'qualities', qualities: ['auto'], quality: 'auto' });
+        };
+        window.NiceTvPause = function () {};
+        window.NiceTvPlay = function () {};
+        return;
       }
 
       const opts = {

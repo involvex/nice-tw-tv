@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
+import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,15 +42,40 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           popularFeedControllerProvider.overrideWith(_IdlePopularFeed.new),
           authControllerProvider.overrideWith(_IdleAuth.new),
+          browseCategoriesProvider.overrideWith(
+            (ref) async => const [
+              TwitchCategory(
+                id: '509658',
+                name: 'Just Chatting',
+                boxArtUrl: '',
+              ),
+            ],
+          ),
+          clipsFeedControllerProvider.overrideWith(_IdleClipsFeed.new),
         ],
         child: const NiceTvApp(),
       ),
     );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('Nice TV'), findsWidgets);
-    expect(find.text('Live'), findsOneWidget);
+    expect(find.text('Live'), findsWidgets);
+    expect(find.text('Clips'), findsOneWidget);
     expect(find.text('Following'), findsOneWidget);
     expect(find.text('VODs'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('All'), findsOneWidget);
+    expect(find.text('Just Chatting'), findsOneWidget);
   });
+}
+
+class _IdleClipsFeed extends ClipsFeedController {
+  @override
+  ClipsFeedState build() => const ClipsFeedState();
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  Future<void> loadMore() async {}
 }

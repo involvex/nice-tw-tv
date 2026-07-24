@@ -112,6 +112,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      GoRoute(
+        path: '/clip/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final title = state.uri.queryParameters['title'];
+          final login = state.uri.queryParameters['login'] ?? 'clip';
+          return WatchScreen(
+            channelLogin: login,
+            title: title,
+            clipId: id,
+          );
+        },
+      ),
     ],
   );
 });

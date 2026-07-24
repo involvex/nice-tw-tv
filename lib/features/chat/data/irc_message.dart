@@ -8,14 +8,10 @@ class ChatBadgeRef {
 
   static List<ChatBadgeRef> parse(String? raw) {
     if (raw == null || raw.isEmpty) return const [];
-    return raw
-        .split(',')
-        .where((e) => e.contains('/'))
-        .map((pair) {
-          final parts = pair.split('/');
-          return ChatBadgeRef(setId: parts[0], version: parts[1]);
-        })
-        .toList();
+    return raw.split(',').where((e) => e.contains('/')).map((pair) {
+      final parts = pair.split('/');
+      return ChatBadgeRef(setId: parts[0], version: parts[1]);
+    }).toList();
   }
 }
 
