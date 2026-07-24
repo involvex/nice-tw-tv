@@ -5,24 +5,34 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:nice_tv/features/watch/data/hls_resolver.dart';
 
 class NativeHlsPlayer extends ConsumerStatefulWidget {
-  const NativeHlsPlayer({super.key, this.channelLogin, this.vodId})
-    : assert(
-        channelLogin != null || vodId != null,
-        'Provide channelLogin or vodId',
-      );
+  const NativeHlsPlayer({
+    super.key,
+    this.channelLogin,
+    this.vodId,
+    this.onFailed,
+  }) : assert(
+         channelLogin != null || vodId != null,
+         'Provide channelLogin or vodId',
+       );
 
   final String? channelLogin;
   final String? vodId;
 
+  /// Called once when resolve/open fails so the host can fall back to embed.
+  final ValueChanged<Object>? onFailed;
+
   @override
-  ConsumerState<NativeHlsPlayer> createState() => _NativeHlsPlayerState();
+  ConsumerState<NativeHlsPlayer> createState() => NativeHlsPlayerState();
 }
 
-class _NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
+class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   late final Player _player;
   late final VideoController _controller;
   String? _error;
   var _loading = true;
+  var _failureReported = false;
+
+  Player get player => _player;
 
   @override
   void initState() {
@@ -37,6 +47,7 @@ class _NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.channelLogin != widget.channelLogin ||
         oldWidget.vodId != widget.vodId) {
+      _failureReported = false;
       _open();
     }
   }
@@ -60,8 +71,14 @@ class _NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
           _error = e.toString();
         });
       }
+      if (!_failureReported) {
+        _failureReported = true;
+        widget.onFailed?.call(e);
+      }
     }
   }
+
+  Future<void> retry() => _open();
 
   @override
   void dispose() {

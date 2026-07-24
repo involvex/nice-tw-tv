@@ -115,15 +115,25 @@ class AuthRepository {
         now.isBefore(_appTokenExpiry!)) {
       return _appToken!;
     }
-    final response = await dio.post<Map<String, dynamic>>(
-      'https://id.twitch.tv/oauth2/token',
-      queryParameters: {
-        'client_id': AppEnv.clientId,
-        'client_secret': AppEnv.clientSecret,
-        'grant_type': 'client_credentials',
-      },
-    );
-    final data = response.data!;
+
+    final Map<String, dynamic> data;
+    if (AppEnv.hasTokenProxy) {
+      final response = await dio.get<Map<String, dynamic>>(
+        AppEnv.tokenProxyUrl,
+      );
+      data = response.data!;
+    } else {
+      final response = await dio.post<Map<String, dynamic>>(
+        'https://id.twitch.tv/oauth2/token',
+        queryParameters: {
+          'client_id': AppEnv.clientId,
+          'client_secret': AppEnv.clientSecret,
+          'grant_type': 'client_credentials',
+        },
+      );
+      data = response.data!;
+    }
+
     _appToken = data['access_token'] as String;
     final expiresIn = data['expires_in'] as int? ?? 3600;
     _appTokenExpiry = now.add(Duration(seconds: expiresIn - 60));

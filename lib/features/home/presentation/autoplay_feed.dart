@@ -113,9 +113,7 @@ class _AutoplayPage extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: Colors.white,
-                  shadows: const [
-                    Shadow(blurRadius: 8, color: Colors.black54),
-                  ],
+                  shadows: const [Shadow(blurRadius: 8, color: Colors.black54)],
                 ),
               ),
               const SizedBox(height: 4),
@@ -189,7 +187,10 @@ class _CategoryStreamsScreenState extends ConsumerState<CategoryStreamsScreen> {
     try {
       final page = await ref
           .read(helixRepositoryProvider)
-          .getStreamsByGame(gameId: widget.gameId, cursor: more ? _cursor : null);
+          .getStreamsByGame(
+            gameId: widget.gameId,
+            cursor: more ? _cursor : null,
+          );
       setState(() {
         _streams = more ? [..._streams, ...page.streams] : page.streams;
         _cursor = page.cursor;

@@ -5,6 +5,7 @@ import 'package:nice_tv/features/auth/presentation/login_screen.dart';
 import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
 import 'package:nice_tv/features/home/presentation/following_screen.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
+import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 import 'package:nice_tv/features/notifications/presentation/notifications_screen.dart';
 import 'package:nice_tv/features/profile/presentation/channel_profile_screen.dart';
 import 'package:nice_tv/features/search/presentation/search_screen.dart';
@@ -13,6 +14,8 @@ import 'package:nice_tv/features/vod/presentation/vod_screen.dart';
 import 'package:nice_tv/features/watch/presentation/watch_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
+  // Keep live-alert polling warm while the shell is alive.
+  ref.watch(notificationsInboxProvider);
   return GoRouter(
     initialLocation: '/',
     routes: [

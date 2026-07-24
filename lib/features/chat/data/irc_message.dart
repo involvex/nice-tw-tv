@@ -1,5 +1,24 @@
 import 'package:nice_tv/features/emotes/data/emote.dart';
 
+class ChatBadgeRef {
+  const ChatBadgeRef({required this.setId, required this.version});
+
+  final String setId;
+  final String version;
+
+  static List<ChatBadgeRef> parse(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    return raw
+        .split(',')
+        .where((e) => e.contains('/'))
+        .map((pair) {
+          final parts = pair.split('/');
+          return ChatBadgeRef(setId: parts[0], version: parts[1]);
+        })
+        .toList();
+  }
+}
+
 class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -11,6 +30,7 @@ class ChatMessage {
     required this.isAction,
     required this.timestamp,
     this.system = false,
+    this.badges = const [],
   });
 
   final String id;
@@ -22,6 +42,7 @@ class ChatMessage {
   final bool isAction;
   final DateTime timestamp;
   final bool system;
+  final List<ChatBadgeRef> badges;
 
   factory ChatMessage.system(String text) {
     return ChatMessage(
@@ -126,6 +147,7 @@ class IrcMessageParser {
           : parsed.tags['color'],
       isAction: isAction,
       timestamp: DateTime.now(),
+      badges: ChatBadgeRef.parse(parsed.tags['badges']),
     );
   }
 }

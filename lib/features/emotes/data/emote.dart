@@ -28,6 +28,19 @@ class EmoteCatalog {
       byName.values.toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
+  List<Emote> byProvider(EmoteProvider provider) {
+    return all.where((e) => e.provider == provider).toList();
+  }
+
+  List<Emote> filter({EmoteProvider? provider, String query = ''}) {
+    final lower = query.trim().toLowerCase();
+    return all.where((e) {
+      if (provider != null && e.provider != provider) return false;
+      if (lower.isEmpty) return true;
+      return e.name.toLowerCase().contains(lower);
+    }).toList();
+  }
+
   List<Emote> suggest(String prefix, {int limit = 12}) {
     if (prefix.isEmpty) return const [];
     final lower = prefix.toLowerCase();

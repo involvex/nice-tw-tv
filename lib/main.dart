@@ -39,7 +39,8 @@ class NiceTvApp extends ConsumerWidget {
               padding: const EdgeInsets.all(24),
               child: Text(
                 'Missing Twitch credentials.\n'
-                'Add CLIENT_ID and SECRET to .env',
+                'Add CLIENT_ID and either SECRET (local) or '
+                'TOKEN_PROXY_URL (production) to .env',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium,
               ),

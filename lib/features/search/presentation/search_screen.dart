@@ -11,33 +11,32 @@ class SearchQuery {
   final String value;
 
   @override
-  bool operator ==(Object other) => other is SearchQuery && other.value == value;
+  bool operator ==(Object other) =>
+      other is SearchQuery && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
 }
 
 class SearchResults {
-  const SearchResults({
-    required this.streams,
-    required this.categories,
-  });
+  const SearchResults({required this.streams, required this.categories});
 
   final List<TwitchStream> streams;
   final List<TwitchCategory> categories;
 }
 
-final searchResultsProvider =
-    FutureProvider.family<SearchResults, SearchQuery>((ref, query) async {
-      final helix = ref.watch(helixRepositoryProvider);
-      if (query.value.trim().isEmpty) {
-        final categories = await helix.getTopGames();
-        return SearchResults(streams: const [], categories: categories);
-      }
-      final streams = await helix.searchLiveChannels(query.value);
-      final categories = await helix.searchCategories(query.value);
-      return SearchResults(streams: streams.streams, categories: categories);
-    });
+final searchResultsProvider = FutureProvider.family<SearchResults, SearchQuery>(
+  (ref, query) async {
+    final helix = ref.watch(helixRepositoryProvider);
+    if (query.value.trim().isEmpty) {
+      final categories = await helix.getTopGames();
+      return SearchResults(streams: const [], categories: categories);
+    }
+    final streams = await helix.searchLiveChannels(query.value);
+    final categories = await helix.searchCategories(query.value);
+    return SearchResults(streams: streams.streams, categories: categories);
+  },
+);
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -115,7 +114,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       final cat = data.categories[index];
                       return InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () => context.push('/category/${cat.id}?name=${Uri.encodeComponent(cat.name)}'),
+                        onTap: () => context.push(
+                          '/category/${cat.id}?name=${Uri.encodeComponent(cat.name)}',
+                        ),
                         child: SizedBox(
                           width: 96,
                           child: Column(
@@ -145,7 +146,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               const SizedBox(height: 20),
               Text(
-                _query.value.isEmpty ? 'Type to find live channels' : 'Live channels',
+                _query.value.isEmpty
+                    ? 'Type to find live channels'
+                    : 'Live channels',
                 style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -171,7 +174,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         fit: BoxFit.cover,
                       ),
                     ),
-                    title: Text(stream.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    title: Text(
+                      stream.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text('${stream.userName} · ${stream.gameName}'),
                     onTap: () {
                       final uri = Uri(

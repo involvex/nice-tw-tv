@@ -88,8 +88,7 @@ class FollowingScreen extends ConsumerWidget {
               )
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount:
-                    feed.streams.length + (feed.cursor != null ? 1 : 0),
+                itemCount: feed.streams.length + (feed.cursor != null ? 1 : 0),
                 separatorBuilder: (_, _) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
                   if (index >= feed.streams.length) {

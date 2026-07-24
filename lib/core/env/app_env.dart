@@ -7,8 +7,14 @@ class AppEnv {
   static String get clientId => dotenv.env['CLIENT_ID'] ?? '';
 
   /// Client secret — used only for local app-token (client credentials).
-  /// Never ship this in production release builds without a backend proxy.
+  /// Prefer [tokenProxyUrl] for production so SECRET never ships in the APK.
   static String get clientSecret => dotenv.env['SECRET'] ?? '';
+
+  /// Optional HTTPS endpoint that returns a Twitch app access token JSON
+  /// (`access_token`, `expires_in`) using server-side client credentials.
+  static String get tokenProxyUrl => dotenv.env['TOKEN_PROXY_URL'] ?? '';
+
+  static bool get hasTokenProxy => tokenProxyUrl.trim().isNotEmpty;
 
   static const redirectUri = 'https://twitch.tv/login';
 
@@ -20,5 +26,5 @@ class AppEnv {
   ];
 
   static bool get isConfigured =>
-      clientId.isNotEmpty && clientSecret.isNotEmpty;
+      clientId.isNotEmpty && (hasTokenProxy || clientSecret.isNotEmpty);
 }

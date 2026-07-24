@@ -30,6 +30,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   var _qualities = <String>['auto'];
   String? _activeQuality;
   var _pipSupported = false;
+  var _forceEmbedFallback = false;
 
   @override
   void initState() {
@@ -79,6 +80,16 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     if (event.quality != null && event.quality!.isNotEmpty) {
       setState(() => _activeQuality = event.quality);
     }
+  }
+
+  void _onNativeFailed(Object error) {
+    if (!mounted || _forceEmbedFallback) return;
+    setState(() => _forceEmbedFallback = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Native HLS failed — switched to embed player'),
+      ),
+    );
   }
 
   Future<void> _openLayoutSheet() async {
@@ -210,7 +221,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     onPressed: () async {
                       await _saveProfile(draft);
                       if (context.mounted) Navigator.pop(context);
-                      setState(() {});
+                      setState(() {
+                        _forceEmbedFallback = false;
+                      });
                     },
                     child: const Text('Save profile'),
                   ),
@@ -234,7 +247,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         profiles[widget.channelLogin.toLowerCase()] ??
         const StreamerLayoutProfile();
     final globalBackend = ref.watch(playerBackendControllerProvider);
-    final backend = profile.playerBackend ?? globalBackend;
+    final preferredBackend = profile.playerBackend ?? globalBackend;
+    final useNative =
+        preferredBackend == PlayerBackend.nativeHls && !_forceEmbedFallback;
     final quality = profile.preferredQuality ?? _quality;
     final showChat = profile.chatPlacement != ChatPlacement.hidden;
     final forceSide =
@@ -245,10 +260,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     final player = AspectRatio(
       aspectRatio: 16 / 9,
-      child: backend == PlayerBackend.nativeHls
+      child: useNative
           ? NativeHlsPlayer(
               channelLogin: widget.vodId == null ? widget.channelLogin : null,
               vodId: widget.vodId,
+              onFailed: _onNativeFailed,
             )
           : TwitchEmbedPlayer(
               key: _embedKey,
@@ -287,16 +303,17 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               onPressed: () => PipService.enter(),
               icon: const Icon(Icons.picture_in_picture_alt_outlined),
             ),
-          PopupMenuButton<String>(
-            tooltip: 'Quality',
-            initialValue: _activeQuality ?? quality,
-            onSelected: _setQuality,
-            itemBuilder: (context) => [
-              for (final q in _qualities)
-                PopupMenuItem(value: q, child: Text(q)),
-            ],
-            icon: const Icon(Icons.high_quality_outlined),
-          ),
+          if (!useNative)
+            PopupMenuButton<String>(
+              tooltip: 'Quality',
+              initialValue: _activeQuality ?? quality,
+              onSelected: _setQuality,
+              itemBuilder: (context) => [
+                for (final q in _qualities)
+                  PopupMenuItem(value: q, child: Text(q)),
+              ],
+              icon: const Icon(Icons.high_quality_outlined),
+            ),
           IconButton(
             tooltip: 'Layout profile',
             onPressed: _openLayoutSheet,

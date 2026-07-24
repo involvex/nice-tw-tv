@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/core/env/app_env.dart';
 import 'package:nice_tv/core/network/dio_providers.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
@@ -156,6 +157,48 @@ class HelixRepository {
     final data = response.data?['data'] as List<dynamic>? ?? [];
     if (data.isEmpty) return null;
     return TwitchChannelInfo.fromJson(data.first as Map<String, dynamic>);
+  }
+
+  Future<BadgeCatalog> getGlobalChatBadges() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/chat/badges/global',
+    );
+    return _parseBadgeCatalog(response.data!);
+  }
+
+  Future<BadgeCatalog> getChannelChatBadges(String broadcasterId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/chat/badges',
+      queryParameters: {'broadcaster_id': broadcasterId},
+    );
+    return _parseBadgeCatalog(response.data!);
+  }
+
+  BadgeCatalog _parseBadgeCatalog(Map<String, dynamic> body) {
+    final data = body['data'] as List<dynamic>? ?? [];
+    final byKey = <String, TwitchBadge>{};
+    for (final raw in data) {
+      final set = raw as Map<String, dynamic>;
+      final setId = set['set_id'] as String? ?? '';
+      final versions = set['versions'] as List<dynamic>? ?? [];
+      for (final versionRaw in versions) {
+        final version = versionRaw as Map<String, dynamic>;
+        final id = version['id'] as String? ?? '';
+        final url =
+            version['image_url_2x'] as String? ??
+            version['image_url_1x'] as String? ??
+            '';
+        if (setId.isEmpty || id.isEmpty || url.isEmpty) continue;
+        final badge = TwitchBadge(
+          setId: setId,
+          version: id,
+          imageUrl: url,
+          title: version['title'] as String?,
+        );
+        byKey[badge.key] = badge;
+      }
+    }
+    return BadgeCatalog(byKey: byKey);
   }
 
   Future<VodsPage> getVideos({

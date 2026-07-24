@@ -86,8 +86,7 @@ class ChannelProfileScreen extends ConsumerWidget {
                 Text(e.toString(), textAlign: TextAlign.center),
                 const SizedBox(height: 12),
                 FilledButton(
-                  onPressed: () =>
-                      ref.invalidate(channelProfileProvider(args)),
+                  onPressed: () => ref.invalidate(channelProfileProvider(args)),
                   child: const Text('Retry'),
                 ),
               ],
@@ -264,9 +263,6 @@ class SoftAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverAppBar(
-      pinned: true,
-      title: Text(title),
-    );
+    return SliverAppBar(pinned: true, title: Text(title));
   }
 }

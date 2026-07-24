@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
 import 'package:nice_tv/features/emotes/data/emote.dart';
+import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 
 void main() {
   group('IrcMessageParser', () {
@@ -20,6 +22,20 @@ void main() {
       expect(message.message, 'Hello world Kappa');
       expect(message.color, '#1E90FF');
       expect(message.id, 'abc-123');
+    });
+
+    test('parses badges from tags', () {
+      const raw =
+          '@badges=broadcaster/1,subscriber/12,vip/1;color=#FF0000;'
+          'display-name=Host;id=b-1 '
+          ':host!host@host.tmi.twitch.tv PRIVMSG #host :hi';
+      final message = const IrcMessageParser().toChatMessage(raw);
+      expect(message, isNotNull);
+      expect(message!.badges.map((b) => '${b.setId}/${b.version}'), [
+        'broadcaster/1',
+        'subscriber/12',
+        'vip/1',
+      ]);
     });
 
     test('parses ACTION messages', () {
@@ -102,6 +118,96 @@ void main() {
       );
       final hits = catalog.suggest('ke');
       expect(hits.map((e) => e.name), ['Keepo']);
+    });
+
+    test('filter by provider and query', () {
+      final catalog = EmoteCatalog(
+        byName: {
+          'Kappa': const Emote(
+            id: '1',
+            name: 'Kappa',
+            url: 'u',
+            provider: EmoteProvider.twitch,
+          ),
+          'Pog': const Emote(
+            id: '2',
+            name: 'Pog',
+            url: 'u',
+            provider: EmoteProvider.bttv,
+          ),
+        },
+      );
+      expect(
+        catalog.filter(provider: EmoteProvider.bttv).map((e) => e.name),
+        ['Pog'],
+      );
+      expect(catalog.filter(query: 'ka').map((e) => e.name), ['Kappa']);
+    });
+  });
+
+  group('diffWentLive', () {
+    TwitchStream stream({
+      required String userId,
+      String login = 'chan',
+      DateTime? started,
+    }) {
+      return TwitchStream(
+        id: 's-$userId',
+        userId: userId,
+        userLogin: login,
+        userName: login,
+        gameName: 'Game',
+        title: 'Live now',
+        viewerCount: 10,
+        thumbnailUrl: '',
+        startedAt: started ?? DateTime.utc(2026, 1, 1),
+        isMature: false,
+        language: 'en',
+      );
+    }
+
+    test('emits items only for newly live channels', () {
+      final fresh = diffWentLive(
+        previousLiveUserIds: {'a'},
+        currentLive: [
+          stream(userId: 'a', login: 'alpha'),
+          stream(userId: 'b', login: 'beta'),
+        ],
+        knownNotificationIds: {},
+      );
+      expect(fresh.length, 1);
+      expect(fresh.first.userId, 'b');
+      expect(fresh.first.userLogin, 'beta');
+      expect(fresh.first.read, isFalse);
+    });
+
+    test('skips known notification ids', () {
+      final known = LiveNotificationItem.fromStream(
+        stream(userId: 'b', login: 'beta'),
+      );
+      final fresh = diffWentLive(
+        previousLiveUserIds: {},
+        currentLive: [stream(userId: 'b', login: 'beta')],
+        knownNotificationIds: {known.id},
+      );
+      expect(fresh, isEmpty);
+    });
+
+    test('first snapshot with empty previous still reports when not seeded', () {
+      // Controller seeds first poll; pure diff still reports all as new.
+      final fresh = diffWentLive(
+        previousLiveUserIds: {},
+        currentLive: [stream(userId: 'c')],
+        knownNotificationIds: {},
+      );
+      expect(fresh.length, 1);
+    });
+  });
+
+  group('ChatBadgeRef', () {
+    test('parse empty', () {
+      expect(ChatBadgeRef.parse(null), isEmpty);
+      expect(ChatBadgeRef.parse(''), isEmpty);
     });
   });
 }

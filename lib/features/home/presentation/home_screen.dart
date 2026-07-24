@@ -6,6 +6,7 @@ import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
+import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 
 enum HomeFeedMode { cards, autoplay }
@@ -47,6 +48,9 @@ class HomeScreen extends ConsumerWidget {
     final feed = ref.watch(popularFeedControllerProvider);
     final mode = ref.watch(homeFeedModeProvider);
     final auth = ref.watch(authControllerProvider).value;
+    final unread = ref.watch(
+      notificationsInboxProvider.select((s) => s.unreadCount),
+    );
     final theme = Theme.of(context);
 
     if (mode == HomeFeedMode.autoplay) {
@@ -113,7 +117,11 @@ class HomeScreen extends ConsumerWidget {
                 IconButton(
                   tooltip: 'Notifications',
                   onPressed: () => context.push('/notifications'),
-                  icon: const Icon(Icons.notifications_outlined),
+                  icon: Badge(
+                    isLabelVisible: unread > 0,
+                    label: Text(unread > 99 ? '99+' : '$unread'),
+                    child: const Icon(Icons.notifications_outlined),
+                  ),
                 ),
                 if (auth?.isLoggedIn == true)
                   Padding(

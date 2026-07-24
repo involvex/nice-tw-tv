@@ -1,6 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/chat/data/chat_client.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
 import 'package:nice_tv/features/emotes/data/emote.dart';
@@ -89,11 +92,33 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     setState(() => _suggestions = []);
   }
 
+  String _statusLabel(ChatLinkStatus status) {
+    return switch (status) {
+      ChatLinkStatus.connected => 'Connected',
+      ChatLinkStatus.connecting => 'Connecting…',
+      ChatLinkStatus.reconnecting => 'Reconnecting…',
+      ChatLinkStatus.disconnected => 'Disconnected',
+    };
+  }
+
+  Color _statusColor(ChatLinkStatus status, ColorScheme scheme) {
+    return switch (status) {
+      ChatLinkStatus.connected => scheme.primary,
+      ChatLinkStatus.connecting || ChatLinkStatus.reconnecting =>
+        scheme.tertiary,
+      ChatLinkStatus.disconnected => scheme.error,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final chat = ref.watch(chatControllerProvider);
+    final auth = ref.watch(authControllerProvider).value;
     final emotesAsync = ref.watch(
       channelEmotesControllerProvider(widget.broadcasterId ?? ''),
+    );
+    final badgesAsync = ref.watch(
+      channelBadgesControllerProvider(widget.broadcasterId ?? ''),
     );
     final density =
         widget.densityOverride ??
@@ -120,9 +145,50 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     });
 
     final catalog = emotesAsync.value ?? EmoteCatalog();
+    final badges = badgesAsync.value ?? BadgeCatalog();
+    final loggedIn = auth?.isLoggedIn == true;
+    final canSend = chat.canSend;
+    final hint = !loggedIn
+        ? 'Sign in to chat'
+        : !chat.connected
+        ? 'Waiting for connection…'
+        : 'Send a message';
 
     return Column(
       children: [
+        if (chat.status != ChatLinkStatus.connected)
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 10,
+                    color: _statusColor(
+                      chat.status,
+                      Theme.of(context).colorScheme,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusLabel(chat.status),
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+                  if (chat.status == ChatLinkStatus.disconnected ||
+                      chat.status == ChatLinkStatus.reconnecting)
+                    TextButton(
+                      onPressed: () =>
+                          ref.read(chatControllerProvider.notifier).retryNow(),
+                      child: const Text('Retry'),
+                    ),
+                ],
+              ),
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             controller: _scroll,
@@ -135,6 +201,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                 child: ChatMessageTile(
                   message: msg,
                   catalog: catalog,
+                  badges: badges,
                   fontSize: fontSize,
                 ),
               );
@@ -171,26 +238,32 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
               children: [
                 IconButton(
                   tooltip: 'Emotes',
-                  onPressed: () => _openEmotePicker(catalog),
+                  onPressed: canSend ? () => _openEmotePicker(catalog) : null,
                   icon: const Icon(Icons.emoji_emotions_outlined),
                 ),
                 Expanded(
                   child: TextField(
                     controller: _input,
                     focusNode: _focus,
+                    enabled: canSend,
                     textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
-                    decoration: const InputDecoration(
-                      hintText: 'Send a message',
-                      isDense: true,
-                    ),
+                    onSubmitted: (_) {
+                      if (canSend) _send();
+                    },
+                    decoration: InputDecoration(hintText: hint, isDense: true),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _send,
-                  icon: const Icon(Icons.send),
-                ),
+                if (!loggedIn)
+                  FilledButton.tonal(
+                    onPressed: () => context.push('/login'),
+                    child: const Text('Sign in'),
+                  )
+                else
+                  IconButton.filled(
+                    onPressed: canSend ? _send : null,
+                    icon: const Icon(Icons.send),
+                  ),
               ],
             ),
           ),
@@ -203,43 +276,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     final selected = await showModalBottomSheet<Emote>(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
-        final emotes = catalog.all;
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.55,
-          builder: (context, controller) {
-            return Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text('Emotes'),
-                ),
-                Expanded(
-                  child: GridView.builder(
-                    controller: controller,
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 6,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                        ),
-                    itemCount: emotes.length,
-                    itemBuilder: (context, index) {
-                      final emote = emotes[index];
-                      return InkWell(
-                        onTap: () => Navigator.pop(context, emote),
-                        child: CachedNetworkImage(imageUrl: emote.url),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => EmotePickerSheet(catalog: catalog),
     );
     if (selected == null) return;
     final next = '${_input.text}${selected.name} ';
@@ -249,16 +286,149 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   }
 }
 
+class EmotePickerSheet extends StatefulWidget {
+  const EmotePickerSheet({super.key, required this.catalog});
+
+  final EmoteCatalog catalog;
+
+  @override
+  State<EmotePickerSheet> createState() => _EmotePickerSheetState();
+}
+
+class _EmotePickerSheetState extends State<EmotePickerSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  final _search = TextEditingController();
+
+  static const _providers = <(EmoteProvider?, String)>[
+    (null, 'All'),
+    (EmoteProvider.twitch, 'Twitch'),
+    (EmoteProvider.bttv, 'BTTV'),
+    (EmoteProvider.ffz, 'FFZ'),
+    (EmoteProvider.sevenTv, '7TV'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: _providers.length, vsync: this);
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Emotes'),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: TextField(
+                controller: _search,
+                decoration: const InputDecoration(
+                  hintText: 'Search emotes',
+                  prefixIcon: Icon(Icons.search),
+                  isDense: true,
+                ),
+              ),
+            ),
+            TabBar(
+              controller: _tabs,
+              isScrollable: true,
+              tabs: [for (final entry in _providers) Tab(text: entry.$2)],
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabs,
+                children: [
+                  for (final entry in _providers)
+                    _EmoteGrid(
+                      emotes: widget.catalog.filter(
+                        provider: entry.$1,
+                        query: _search.text,
+                      ),
+                      controller: scrollController,
+                      onSelect: (emote) => Navigator.pop(context, emote),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _EmoteGrid extends StatelessWidget {
+  const _EmoteGrid({
+    required this.emotes,
+    required this.controller,
+    required this.onSelect,
+  });
+
+  final List<Emote> emotes;
+  final ScrollController controller;
+  final ValueChanged<Emote> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (emotes.isEmpty) {
+      return const Center(child: Text('No emotes'));
+    }
+    return GridView.builder(
+      controller: controller,
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 6,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+      ),
+      itemCount: emotes.length,
+      itemBuilder: (context, index) {
+        final emote = emotes[index];
+        return InkWell(
+          onTap: () => onSelect(emote),
+          child: Tooltip(
+            message: emote.name,
+            child: CachedNetworkImage(imageUrl: emote.url),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class ChatMessageTile extends StatelessWidget {
   const ChatMessageTile({
     super.key,
     required this.message,
     required this.catalog,
+    required this.badges,
     required this.fontSize,
   });
 
   final ChatMessage message;
   final EmoteCatalog catalog;
+  final BadgeCatalog badges;
   final double fontSize;
 
   @override
@@ -277,10 +447,24 @@ class ChatMessageTile extends StatelessWidget {
 
     final color = _parseColor(message.color) ?? theme.colorScheme.primary;
     final segments = tokenizeMessage(message.message, catalog);
+    final resolvedBadges = badges.resolveAll(message.badges);
 
     return Text.rich(
       TextSpan(
         children: [
+          for (final badge in resolvedBadges)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 3),
+                child: CachedNetworkImage(
+                  imageUrl: badge.imageUrl,
+                  height: fontSize + 2,
+                  width: fontSize + 2,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
           TextSpan(
             text: '${message.displayName}: ',
             style: TextStyle(
