@@ -43,6 +43,9 @@ class SettingsStorage {
   static const accentKey = 'accent_color';
   static const chatDensityKey = 'chat_density';
   static const videoQualityKey = 'video_quality';
+  static const discoveryLanguageKey = 'discovery_language';
+  static const discoveryHideMatureKey = 'discovery_hide_mature';
+  static const discoverySortOrderKey = 'discovery_sort_order';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -63,4 +66,26 @@ class SettingsStorage {
 
   Future<void> setVideoQuality(String value) =>
       _prefs.setString(videoQualityKey, value);
+
+  String? get discoveryLanguage => _prefs.getString(discoveryLanguageKey);
+
+  Future<void> setDiscoveryLanguage(String? value) async {
+    if (value == null) {
+      await _prefs.remove(discoveryLanguageKey);
+    } else {
+      await _prefs.setString(discoveryLanguageKey, value);
+    }
+  }
+
+  bool get discoveryHideMature =>
+      _prefs.getBool(discoveryHideMatureKey) ?? false;
+
+  Future<void> setDiscoveryHideMature(bool value) =>
+      _prefs.setBool(discoveryHideMatureKey, value);
+
+  String get discoverySortOrder =>
+      _prefs.getString(discoverySortOrderKey) ?? 'viewerCount';
+
+  Future<void> setDiscoverySortOrder(String value) =>
+      _prefs.setString(discoverySortOrderKey, value);
 }

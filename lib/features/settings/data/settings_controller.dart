@@ -10,12 +10,18 @@ class AppSettings {
     required this.accentArgb,
     required this.chatDensity,
     required this.videoQuality,
+    this.discoveryLanguage,
+    this.discoveryHideMature = false,
+    this.discoverySortOrder = 'viewerCount',
   });
 
   final ThemeMode themeMode;
   final int accentArgb;
   final int chatDensity;
   final String videoQuality;
+  final String? discoveryLanguage;
+  final bool discoveryHideMature;
+  final String discoverySortOrder;
 
   Color get accent => Color(accentArgb);
 
@@ -24,12 +30,18 @@ class AppSettings {
     int? accentArgb,
     int? chatDensity,
     String? videoQuality,
+    String? discoveryLanguage,
+    bool? discoveryHideMature,
+    String? discoverySortOrder,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
       accentArgb: accentArgb ?? this.accentArgb,
       chatDensity: chatDensity ?? this.chatDensity,
       videoQuality: videoQuality ?? this.videoQuality,
+      discoveryLanguage: discoveryLanguage ?? this.discoveryLanguage,
+      discoveryHideMature: discoveryHideMature ?? this.discoveryHideMature,
+      discoverySortOrder: discoverySortOrder ?? this.discoverySortOrder,
     );
   }
 
@@ -67,6 +79,9 @@ class SettingsController extends Notifier<AppSettings> {
       accentArgb: storage.accentArgb,
       chatDensity: storage.chatDensity,
       videoQuality: storage.videoQuality,
+      discoveryLanguage: storage.discoveryLanguage,
+      discoveryHideMature: storage.discoveryHideMature,
+      discoverySortOrder: storage.discoverySortOrder,
     );
   }
 
@@ -91,6 +106,21 @@ class SettingsController extends Notifier<AppSettings> {
   Future<void> setVideoQuality(String quality) async {
     await ref.read(settingsStorageProvider).setVideoQuality(quality);
     state = state.copyWith(videoQuality: quality);
+  }
+
+  Future<void> setDiscoveryLanguage(String? language) async {
+    await ref.read(settingsStorageProvider).setDiscoveryLanguage(language);
+    state = state.copyWith(discoveryLanguage: language);
+  }
+
+  Future<void> setDiscoveryHideMature(bool hide) async {
+    await ref.read(settingsStorageProvider).setDiscoveryHideMature(hide);
+    state = state.copyWith(discoveryHideMature: hide);
+  }
+
+  Future<void> setDiscoverySortOrder(String sortOrder) async {
+    await ref.read(settingsStorageProvider).setDiscoverySortOrder(sortOrder);
+    state = state.copyWith(discoverySortOrder: sortOrder);
   }
 }
 

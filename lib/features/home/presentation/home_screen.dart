@@ -93,6 +93,11 @@ class HomeScreen extends ConsumerWidget {
               onPressed: () => context.push('/search'),
               icon: const Icon(Icons.search),
             ),
+            IconButton(
+              tooltip: 'History',
+              onPressed: () => context.push('/history'),
+              icon: const Icon(Icons.history_outlined),
+            ),
           ],
         ),
         body: feed.isLoading && feed.streams.isEmpty
@@ -150,6 +155,11 @@ class HomeScreen extends ConsumerWidget {
                     child: const Icon(Icons.notifications_outlined),
                   ),
                 ),
+                IconButton(
+                  tooltip: 'History',
+                  onPressed: () => context.push('/history'),
+                  icon: const Icon(Icons.history_outlined),
+                ),
                 if (auth?.isLoggedIn == true)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
@@ -169,6 +179,7 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SliverToBoxAdapter(child: _HomeTabBar()),
             const SliverToBoxAdapter(child: _CategoryChips()),
+            const SliverToBoxAdapter(child: _DiscoveryFilterBar()),
             if (tab == HomeBrowseTab.live) ...[
               if (feed.isLoading && feed.streams.isEmpty)
                 const SliverFillRemaining(
@@ -224,8 +235,9 @@ class HomeScreen extends ConsumerWidget {
                 SliverFillRemaining(
                   child: _ErrorPane(
                     message: clips.error!,
-                    onRetry: () =>
-                        ref.read(clipsFeedControllerProvider.notifier).refresh(),
+                    onRetry: () => ref
+                        .read(clipsFeedControllerProvider.notifier)
+                        .refresh(),
                   ),
                 )
               else if (clips.clips.isEmpty)
@@ -325,8 +337,9 @@ class _CategoryChips extends ConsumerWidget {
                 child: FilterChip(
                   label: const Text('All'),
                   selected: selected == null,
-                  onSelected: (_) =>
-                      ref.read(homeCategoryFilterProvider.notifier).select(null),
+                  onSelected: (_) => ref
+                      .read(homeCategoryFilterProvider.notifier)
+                      .select(null),
                 ),
               ),
               for (final category in list)
@@ -359,6 +372,128 @@ class _CategoryChips extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+class _DiscoveryFilterBar extends ConsumerWidget {
+  const _DiscoveryFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsControllerProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Row(
+        children: [
+          FilterChip(
+            label: Text(settings.discoveryLanguage?.toUpperCase() ?? 'LANG'),
+            onSelected: (_) => _openLanguageSheet(context, ref),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: Text(
+              settings.discoveryHideMature ? 'Mature: off' : 'Mature: on',
+            ),
+            selected: settings.discoveryHideMature,
+            onSelected: (_) => ref
+                .read(settingsControllerProvider.notifier)
+                .setDiscoveryHideMature(!settings.discoveryHideMature),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            avatar: const Icon(Icons.sort, size: 18),
+            label: Text(switch (settings.discoverySortOrder) {
+              'viewerCount' => 'Viewers',
+              'recentlyStarted' => 'Recent',
+              'alphabetical' => 'A-Z',
+              _ => 'Sort',
+            }),
+            onSelected: (_) => _openSortSheet(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openLanguageSheet(BuildContext context, WidgetRef ref) async {
+    final settings = ref.read(settingsControllerProvider);
+    final languages = const [
+      (null, 'All'),
+      ('en', 'English'),
+      ('de', 'German'),
+      ('fr', 'French'),
+      ('es', 'Spanish'),
+      ('pt', 'Portuguese'),
+      ('ko', 'Korean'),
+      ('ja', 'Japanese'),
+      ('zh', 'Chinese'),
+      ('ru', 'Russian'),
+      ('other', 'Other'),
+    ];
+    final current = settings.discoveryLanguage;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => ListView(
+        shrinkWrap: true,
+        children: [
+          for (final (value, label) in languages)
+            ListTile(
+              title: Text(label),
+              trailing: current == value
+                  ? Icon(
+                      Icons.check,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : null,
+              onTap: () => Navigator.pop(context, value),
+            ),
+        ],
+      ),
+    );
+    if (selected == null) return;
+    if (selected != settings.discoveryLanguage) {
+      ref
+          .read(settingsControllerProvider.notifier)
+          .setDiscoveryLanguage(selected);
+    }
+  }
+
+  Future<void> _openSortSheet(BuildContext context, WidgetRef ref) async {
+    final settings = ref.read(settingsControllerProvider);
+    final sorts = const [
+      ('viewerCount', 'Viewer count'),
+      ('recentlyStarted', 'Recently started'),
+      ('alphabetical', 'Alphabetical (A-Z)'),
+    ];
+    final current = settings.discoverySortOrder;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => ListView(
+        shrinkWrap: true,
+        children: [
+          for (final (value, label) in sorts)
+            ListTile(
+              title: Text(label),
+              trailing: current == value
+                  ? Icon(
+                      Icons.check,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : null,
+              onTap: () => Navigator.pop(context, value),
+            ),
+        ],
+      ),
+    );
+    if (selected == null) return;
+    if (selected != settings.discoverySortOrder) {
+      ref
+          .read(settingsControllerProvider.notifier)
+          .setDiscoverySortOrder(selected);
+    }
   }
 }
 

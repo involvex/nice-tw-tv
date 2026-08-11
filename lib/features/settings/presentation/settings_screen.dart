@@ -138,6 +138,78 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          Text('Discovery', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Language'),
+            subtitle: Text(
+              settings.discoveryLanguage?.toUpperCase() ?? 'All languages',
+            ),
+            trailing: DropdownButton<String>(
+              value: settings.discoveryLanguage,
+              items: const [
+                DropdownMenuItem(value: null, child: Text('All')),
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'de', child: Text('German')),
+                DropdownMenuItem(value: 'fr', child: Text('French')),
+                DropdownMenuItem(value: 'es', child: Text('Spanish')),
+                DropdownMenuItem(value: 'pt', child: Text('Portuguese')),
+                DropdownMenuItem(value: 'ko', child: Text('Korean')),
+                DropdownMenuItem(value: 'ja', child: Text('Japanese')),
+                DropdownMenuItem(value: 'zh', child: Text('Chinese')),
+                DropdownMenuItem(value: 'ru', child: Text('Russian')),
+                DropdownMenuItem(value: 'other', child: Text('Other')),
+              ],
+              onChanged: (value) {
+                if (value == settings.discoveryLanguage) return;
+                ref
+                    .read(settingsControllerProvider.notifier)
+                    .setDiscoveryLanguage(value);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Hide mature content'),
+            subtitle: const Text('Filter out streams marked as mature'),
+            value: settings.discoveryHideMature,
+            onChanged: (value) {
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setDiscoveryHideMature(value);
+            },
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Sort by'),
+            subtitle: Text(switch (settings.discoverySortOrder) {
+              'viewerCount' => 'Viewer count',
+              'recentlyStarted' => 'Recently started',
+              'alphabetical' => 'Alphabetical (A-Z)',
+              _ => settings.discoverySortOrder,
+            }),
+            trailing: DropdownButton<String>(
+              value: settings.discoverySortOrder,
+              items: const [
+                DropdownMenuItem(value: 'viewerCount', child: Text('Viewers')),
+                DropdownMenuItem(
+                  value: 'recentlyStarted',
+                  child: Text('Recent'),
+                ),
+                DropdownMenuItem(value: 'alphabetical', child: Text('A-Z')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                ref
+                    .read(settingsControllerProvider.notifier)
+                    .setDiscoverySortOrder(value);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
           Text('Player backend', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
           Consumer(

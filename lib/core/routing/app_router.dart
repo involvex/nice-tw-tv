@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/presentation/login_screen.dart';
+import 'package:nice_tv/features/history/data/history_controller.dart';
+import 'package:nice_tv/features/history/presentation/history_screen.dart';
 import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
 import 'package:nice_tv/features/home/presentation/following_screen.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
@@ -14,8 +16,8 @@ import 'package:nice_tv/features/vod/presentation/vod_screen.dart';
 import 'package:nice_tv/features/watch/presentation/watch_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  // Keep live-alert polling warm while the shell is alive.
   ref.watch(notificationsInboxProvider);
+  ref.watch(historyControllerProvider);
   return GoRouter(
     initialLocation: '/',
     routes: [
@@ -68,6 +70,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
+        path: '/history',
+        builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
         path: '/profile/:login',
         builder: (context, state) {
           return ChannelProfileScreen(
@@ -118,11 +124,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           final title = state.uri.queryParameters['title'];
           final login = state.uri.queryParameters['login'] ?? 'clip';
-          return WatchScreen(
-            channelLogin: login,
-            title: title,
-            clipId: id,
-          );
+          return WatchScreen(channelLogin: login, title: title, clipId: id);
         },
       ),
     ],

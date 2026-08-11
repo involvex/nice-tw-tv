@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/chat/presentation/chat_panel.dart';
+import 'package:nice_tv/features/history/data/history_controller.dart';
+import 'package:nice_tv/features/history/data/history_entry.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/watch/data/pip_service.dart';
@@ -34,6 +38,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   String? _activeQuality;
   var _pipSupported = false;
   var _forceEmbedFallback = false;
+  Timer? _historyTimer;
 
   @override
   void initState() {
@@ -41,6 +46,37 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     // ignore: discarded_futures
     PipService.isSupported().then((value) {
       if (mounted) setState(() => _pipSupported = value);
+    });
+    _scheduleHistory();
+  }
+
+  @override
+  void dispose() {
+    _historyTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleHistory() {
+    _historyTimer?.cancel();
+    _historyTimer = Timer(const Duration(seconds: 15), () {
+      if (!mounted) return;
+      final title = widget.title;
+      if (title == null || title.isEmpty) return;
+      final thumbnail = widget.clipId != null
+          ? 'https://static-cdn.jtvnw.net/previews-ttv/live_user_${widget.channelLogin}-440x248.jpg'
+          : widget.broadcasterId != null
+          ? 'https://static-cdn.jtvnw.net/previews-ttv/live_user_${widget.channelLogin}-440x248.jpg'
+          : '';
+      final entry = HistoryEntry(
+        userLogin: widget.channelLogin,
+        userName: widget.channelLogin,
+        title: title,
+        gameName: null,
+        thumbnailUrl: thumbnail,
+        watchedAt: DateTime.now(),
+        streamId: widget.broadcasterId,
+      );
+      ref.read(historyControllerProvider.notifier).addEntry(entry);
     });
   }
 
@@ -258,8 +294,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         preferredBackend == PlayerBackend.nativeHls &&
         !_forceEmbedFallback;
     final quality = profile.preferredQuality ?? _quality;
-    final showChat =
-        !isClip && profile.chatPlacement != ChatPlacement.hidden;
+    final showChat = !isClip && profile.chatPlacement != ChatPlacement.hidden;
     final forceSide =
         profile.chatPlacement == ChatPlacement.side ||
         (profile.chatPlacement == ChatPlacement.bottom && isLandscape);

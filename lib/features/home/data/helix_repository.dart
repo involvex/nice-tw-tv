@@ -7,6 +7,7 @@ import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/home/data/twitch_clip.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
 
 final helixDioProvider = Provider<Dio>((ref) {
@@ -31,12 +32,19 @@ class HelixRepository {
 
   final Dio _dio;
 
-  Future<StreamsPage> getTopStreams({String? cursor, int first = 20}) async {
+  Future<StreamsPage> getTopStreams({
+    String? cursor,
+    int first = 20,
+    String? language,
+    String? type,
+  }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/helix/streams',
       queryParameters: {
         'first': first,
         if (cursor != null && cursor.isNotEmpty) 'after': cursor,
+        if (language != null && language.isNotEmpty) 'language': language,
+        if (type != null && type.isNotEmpty) 'type': type,
       },
     );
     return _parseStreamsPage(response.data!);
@@ -46,6 +54,8 @@ class HelixRepository {
     required String userId,
     String? cursor,
     int first = 20,
+    String? language,
+    String? type,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/helix/streams/followed',
@@ -53,6 +63,8 @@ class HelixRepository {
         'user_id': userId,
         'first': first,
         if (cursor != null && cursor.isNotEmpty) 'after': cursor,
+        if (language != null && language.isNotEmpty) 'language': language,
+        if (type != null && type.isNotEmpty) 'type': type,
       },
     );
     return _parseStreamsPage(response.data!);
@@ -111,6 +123,8 @@ class HelixRepository {
     required String gameId,
     String? cursor,
     int first = 20,
+    String? language,
+    String? type,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/helix/streams',
@@ -118,6 +132,8 @@ class HelixRepository {
         'game_id': gameId,
         'first': first,
         if (cursor != null && cursor.isNotEmpty) 'after': cursor,
+        if (language != null && language.isNotEmpty) 'language': language,
+        if (type != null && type.isNotEmpty) 'type': type,
       },
     );
     return _parseStreamsPage(response.data!);
@@ -357,6 +373,51 @@ class HelixRepository {
         .toList();
     return StreamsPage(streams: streams, cursor: cursor);
   }
+
+  static List<TwitchStream> applyDiscoveryFilters({
+    required List<TwitchStream> streams,
+    String? language,
+    bool hideMature = false,
+    String sortOrder = 'viewerCount',
+  }) {
+    var result = streams;
+    if (hideMature) {
+      result = result.where((s) => !s.isMature).toList();
+    }
+    final lang = language?.trim().toLowerCase();
+    if (lang != null && lang.isNotEmpty && lang != 'other') {
+      result = result.where((s) => s.language == lang).toList();
+    } else if (lang == 'other') {
+      final known = <String>{
+        'en',
+        'de',
+        'fr',
+        'es',
+        'pt',
+        'ko',
+        'ja',
+        'zh',
+        'ru',
+      };
+      result = result.where((s) => !known.contains(s.language)).toList();
+    }
+    switch (sortOrder) {
+      case 'recentlyStarted':
+        result = List.from(result)
+          ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      case 'alphabetical':
+        result = List.from(result)
+          ..sort(
+            (a, b) =>
+                a.userName.toLowerCase().compareTo(b.userName.toLowerCase()),
+          );
+      case 'viewerCount':
+      default:
+        result = List.from(result)
+          ..sort((a, b) => b.viewerCount.compareTo(a.viewerCount));
+    }
+    return result;
+  }
 }
 
 final helixRepositoryProvider = Provider<HelixRepository>((ref) {
@@ -365,11 +426,7 @@ final helixRepositoryProvider = Provider<HelixRepository>((ref) {
 
 /// Pinned categories that should always appear in the Live/Clips chip row.
 const pinnedBrowseCategories = <TwitchCategory>[
-  TwitchCategory(
-    id: '509658',
-    name: 'Just Chatting',
-    boxArtUrl: '',
-  ),
+  TwitchCategory(id: '509658', name: 'Just Chatting', boxArtUrl: ''),
   TwitchCategory(id: '509670', name: 'IRL', boxArtUrl: ''),
 ];
 
@@ -385,21 +442,20 @@ class HomeCategoryFilterController extends Notifier<TwitchCategory?> {
   void select(TwitchCategory? category) => state = category;
 }
 
-final browseCategoriesProvider =
-    FutureProvider<List<TwitchCategory>>((ref) async {
-      final top = await ref.watch(helixRepositoryProvider).getTopGames(first: 16);
-      final byId = <String, TwitchCategory>{
-        for (final c in pinnedBrowseCategories) c.id: c,
-        for (final c in top) c.id: c,
-      };
-      final pinned = [
-        for (final p in pinnedBrowseCategories) byId[p.id]!,
-      ];
-      final rest = top.where(
-        (c) => !pinnedBrowseCategories.any((p) => p.id == c.id),
-      );
-      return [...pinned, ...rest];
-    });
+final browseCategoriesProvider = FutureProvider<List<TwitchCategory>>((
+  ref,
+) async {
+  final top = await ref.watch(helixRepositoryProvider).getTopGames(first: 16);
+  final byId = <String, TwitchCategory>{
+    for (final c in pinnedBrowseCategories) c.id: c,
+    for (final c in top) c.id: c,
+  };
+  final pinned = [for (final p in pinnedBrowseCategories) byId[p.id]!];
+  final rest = top.where(
+    (c) => !pinnedBrowseCategories.any((p) => p.id == c.id),
+  );
+  return [...pinned, ...rest];
+});
 
 class StreamFeedState {
   const StreamFeedState({
@@ -442,6 +498,10 @@ class PopularFeedController extends Notifier<StreamFeedState> {
       // ignore: discarded_futures
       refresh();
     });
+    ref.listen(settingsControllerProvider, (_, _) {
+      // ignore: discarded_futures
+      refresh();
+    });
     Future.microtask(refresh);
     return const StreamFeedState(isLoading: true);
   }
@@ -454,13 +514,29 @@ class PopularFeedController extends Notifier<StreamFeedState> {
     );
     try {
       final category = ref.read(homeCategoryFilterProvider);
+      final settings = ref.read(settingsControllerProvider);
       final page = category == null
-          ? await ref.read(helixRepositoryProvider).getTopStreams()
+          ? await ref
+                .read(helixRepositoryProvider)
+                .getTopStreams(
+                  language: settings.discoveryLanguage,
+                  type: 'live',
+                )
           : await ref
                 .read(helixRepositoryProvider)
-                .getStreamsByGame(gameId: category.id);
-      state = state.copyWith(
+                .getStreamsByGame(
+                  gameId: category.id,
+                  language: settings.discoveryLanguage,
+                  type: 'live',
+                );
+      final filtered = HelixRepository.applyDiscoveryFilters(
         streams: page.streams,
+        language: settings.discoveryLanguage,
+        hideMature: settings.discoveryHideMature,
+        sortOrder: settings.discoverySortOrder,
+      );
+      state = state.copyWith(
+        streams: filtered,
         cursor: page.cursor,
         isLoading: false,
         clearError: true,
@@ -475,15 +551,31 @@ class PopularFeedController extends Notifier<StreamFeedState> {
     state = state.copyWith(isLoadingMore: true);
     try {
       final category = ref.read(homeCategoryFilterProvider);
+      final settings = ref.read(settingsControllerProvider);
       final page = category == null
           ? await ref
                 .read(helixRepositoryProvider)
-                .getTopStreams(cursor: state.cursor)
+                .getTopStreams(
+                  cursor: state.cursor,
+                  language: settings.discoveryLanguage,
+                  type: 'live',
+                )
           : await ref
                 .read(helixRepositoryProvider)
-                .getStreamsByGame(gameId: category.id, cursor: state.cursor);
+                .getStreamsByGame(
+                  gameId: category.id,
+                  cursor: state.cursor,
+                  language: settings.discoveryLanguage,
+                  type: 'live',
+                );
+      final filtered = HelixRepository.applyDiscoveryFilters(
+        streams: page.streams,
+        language: settings.discoveryLanguage,
+        hideMature: settings.discoveryHideMature,
+        sortOrder: settings.discoverySortOrder,
+      );
       state = state.copyWith(
-        streams: [...state.streams, ...page.streams],
+        streams: [...state.streams, ...filtered],
         cursor: page.cursor,
         isLoadingMore: false,
       );
@@ -501,6 +593,10 @@ final popularFeedControllerProvider =
 class FollowingFeedController extends Notifier<StreamFeedState> {
   @override
   StreamFeedState build() {
+    ref.listen(settingsControllerProvider, (_, _) {
+      // ignore: discarded_futures
+      refresh();
+    });
     Future.microtask(refresh);
     return const StreamFeedState(isLoading: true);
   }
@@ -517,11 +613,22 @@ class FollowingFeedController extends Notifier<StreamFeedState> {
         state = state.copyWith(streams: const [], isLoading: false);
         return;
       }
+      final settings = ref.read(settingsControllerProvider);
       final page = await ref
           .read(helixRepositoryProvider)
-          .getFollowedStreams(userId: auth.userId!);
-      state = state.copyWith(
+          .getFollowedStreams(
+            userId: auth.userId!,
+            language: settings.discoveryLanguage,
+            type: 'live',
+          );
+      final filtered = HelixRepository.applyDiscoveryFilters(
         streams: page.streams,
+        language: settings.discoveryLanguage,
+        hideMature: settings.discoveryHideMature,
+        sortOrder: settings.discoverySortOrder,
+      );
+      state = state.copyWith(
+        streams: filtered,
         cursor: page.cursor,
         isLoading: false,
         clearError: true,
@@ -537,11 +644,23 @@ class FollowingFeedController extends Notifier<StreamFeedState> {
     if (auth?.userId == null) return;
     state = state.copyWith(isLoadingMore: true);
     try {
+      final settings = ref.read(settingsControllerProvider);
       final page = await ref
           .read(helixRepositoryProvider)
-          .getFollowedStreams(userId: auth!.userId!, cursor: state.cursor);
+          .getFollowedStreams(
+            userId: auth!.userId!,
+            cursor: state.cursor,
+            language: settings.discoveryLanguage,
+            type: 'live',
+          );
+      final filtered = HelixRepository.applyDiscoveryFilters(
+        streams: page.streams,
+        language: settings.discoveryLanguage,
+        hideMature: settings.discoveryHideMature,
+        sortOrder: settings.discoverySortOrder,
+      );
       state = state.copyWith(
-        streams: [...state.streams, ...page.streams],
+        streams: [...state.streams, ...filtered],
         cursor: page.cursor,
         isLoadingMore: false,
       );
