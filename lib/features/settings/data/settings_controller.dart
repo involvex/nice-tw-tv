@@ -15,6 +15,7 @@ class AppSettings {
     this.discoverySortOrder = 'viewerCount',
     this.videoVolume = 0.7,
     this.videoMuted = false,
+    this.playbackSpeed = 1.0,
   });
 
   final ThemeMode themeMode;
@@ -26,6 +27,7 @@ class AppSettings {
   final String discoverySortOrder;
   final double videoVolume;
   final bool videoMuted;
+  final double playbackSpeed;
 
   Color get accent => Color(accentArgb);
 
@@ -39,6 +41,7 @@ class AppSettings {
     String? discoverySortOrder,
     double? videoVolume,
     bool? videoMuted,
+    double? playbackSpeed,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -50,6 +53,7 @@ class AppSettings {
       discoverySortOrder: discoverySortOrder ?? this.discoverySortOrder,
       videoVolume: videoVolume ?? this.videoVolume,
       videoMuted: videoMuted ?? this.videoMuted,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 
@@ -92,6 +96,7 @@ class SettingsController extends Notifier<AppSettings> {
       discoverySortOrder: storage.discoverySortOrder,
       videoVolume: storage.videoVolume,
       videoMuted: storage.videoMuted,
+      playbackSpeed: storage.playbackSpeed,
     );
   }
 
@@ -141,6 +146,11 @@ class SettingsController extends Notifier<AppSettings> {
   Future<void> setVideoMuted(bool muted) async {
     await ref.read(settingsStorageProvider).setVideoMuted(muted);
     state = state.copyWith(videoMuted: muted);
+  }
+
+  Future<void> setPlaybackSpeed(double speed) async {
+    await ref.read(settingsStorageProvider).setPlaybackSpeed(speed);
+    state = state.copyWith(playbackSpeed: speed);
   }
 }
 

@@ -16,6 +16,8 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
     this.initialQuality,
     this.initialMuted = false,
     this.initialVolume = 0.7,
+    this.resumePosition,
+    this.initialPlaybackSpeed = 1.0,
   }) : assert(
          channelLogin != null || vodId != null,
          'Provide channelLogin or vodId',
@@ -28,6 +30,8 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
   final String? initialQuality;
   final bool initialMuted;
   final double initialVolume;
+  final Duration? resumePosition;
+  final double initialPlaybackSpeed;
 
   @override
   ConsumerState<NativeHlsPlayer> createState() => NativeHlsPlayerState();
@@ -44,6 +48,7 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   double _volume = 0.7;
   var _muted = false;
   double _unmuteVolume = 0.7;
+  double _playbackSpeed = 1.0;
 
   Player get player => _player;
   String get activeQuality => _activeQuality;
@@ -96,8 +101,16 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
       _volume = widget.initialVolume;
       _muted = widget.initialMuted;
       _unmuteVolume = widget.initialVolume;
+      _playbackSpeed = widget.initialPlaybackSpeed;
       await _player.open(Media((target?.url ?? playlist.masterUrl).toString()));
       await _player.setVolume(_muted ? 0 : _volume * 100);
+      await _player.setRate(_playbackSpeed);
+      final resume = widget.resumePosition;
+      if (resume != null &&
+          resume > Duration.zero &&
+          resume < _player.state.duration - const Duration(seconds: 10)) {
+        await _player.seek(resume);
+      }
       if (mounted) setState(() => _loading = false);
     } on Object catch (e) {
       if (mounted) {
@@ -148,6 +161,21 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
     } else {
       _unmuteVolume = _volume;
     }
+  }
+
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+  }
+
+  Duration? get currentPosition {
+    final d = _player.state.duration;
+    if (d == Duration.zero) return null;
+    return _player.state.position;
+  }
+
+  Future<void> setPlaybackSpeed(double speed) async {
+    _playbackSpeed = speed;
+    await _player.setRate(speed);
   }
 
   @override

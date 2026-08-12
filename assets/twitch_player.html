@@ -78,7 +78,6 @@
       player.addEventListener(Twitch.Player.READY, function () {
         const qualities = qualityNames(player.getQualities());
         post({ type: 'ready', qualities: qualities, quality: player.getQuality() });
-        // Restore volume/muted from config after player is ready
         if (cfg.muted !== undefined && cfg.muted) {
           try { player.setMuted(true); } catch (e) {}
         }
@@ -87,6 +86,12 @@
         }
         if (quality && quality !== 'auto') {
           try { player.setQuality(quality); } catch (e) {}
+        }
+        if (cfg.resumePosition !== undefined && cfg.resumePosition > 0) {
+          try { player.seek(cfg.resumePosition, 'seconds'); } catch (e) {}
+        }
+        if (cfg.playbackSpeed !== undefined && cfg.playbackSpeed !== 1.0) {
+          try { player.setPlaybackRate(cfg.playbackSpeed); } catch (e) {}
         }
       });
 
@@ -104,6 +109,24 @@
 
       window.NiceTvSetVolume = function (vol) {
         try { player.setVolume(vol); } catch (e) {}
+      };
+
+      window.NiceTvSeek = function (seconds) {
+        try { player.seek(seconds, 'seconds'); } catch (e) {}
+      };
+
+      window.NiceTvGetCurrentTime = function () {
+        try {
+          const t = player.getCurrentTime();
+          post({ type: 'position', position: t });
+          return t;
+        } catch (e) {
+          return 0;
+        }
+      };
+
+      window.NiceTvSetRate = function (rate) {
+        try { player.setPlaybackRate(rate); } catch (e) {}
       };
 
       window.NiceTvSetQuality = function (q) {

@@ -48,6 +48,7 @@ class SettingsStorage {
   static const discoverySortOrderKey = 'discovery_sort_order';
   static const videoVolumeKey = 'video_volume';
   static const videoMutedKey = 'video_muted';
+  static const playbackSpeedKey = 'playback_speed';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -100,4 +101,9 @@ class SettingsStorage {
 
   Future<void> setVideoMuted(bool value) =>
       _prefs.setBool(videoMutedKey, value);
+
+  double get playbackSpeed => _prefs.getDouble(playbackSpeedKey) ?? 1.0;
+
+  Future<void> setPlaybackSpeed(double value) =>
+      _prefs.setDouble(playbackSpeedKey, value);
 }

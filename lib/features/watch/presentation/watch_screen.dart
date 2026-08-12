@@ -9,9 +9,12 @@ import 'package:nice_tv/features/history/data/history_entry.dart';
 import 'package:nice_tv/features/profile/data/follow_controller.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
+import 'package:nice_tv/features/vod/data/vod_progress_store.dart';
 import 'package:nice_tv/features/watch/data/pip_service.dart';
 import 'package:nice_tv/features/watch/presentation/native_hls_player.dart';
 import 'package:nice_tv/features/watch/presentation/twitch_embed_player.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WatchScreen extends ConsumerStatefulWidget {
   const WatchScreen({
@@ -41,6 +44,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   var _pipSupported = false;
   var _forceEmbedFallback = false;
   Timer? _historyTimer;
+  Timer? _positionTimer;
+  Duration? _resumePosition;
 
   @override
   void initState() {
@@ -49,13 +54,62 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     PipService.isSupported().then((value) {
       if (mounted) setState(() => _pipSupported = value);
     });
+    if (widget.vodId != null) {
+      SharedPreferences.getInstance().then((prefs) {
+        final store = VodProgressStore(prefs);
+        final pos = store.readPosition(widget.vodId!);
+        if (pos == null) return;
+        _resumePosition = pos;
+        if (mounted) setState(() {});
+      });
+    }
     _scheduleHistory();
+    _schedulePositionSave();
   }
 
   @override
   void dispose() {
     _historyTimer?.cancel();
+    _positionTimer?.cancel();
     super.dispose();
+  }
+
+  void _schedulePositionSave() {
+    if (widget.vodId == null) return;
+    _positionTimer?.cancel();
+    _positionTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!mounted) return;
+      final isClip = widget.clipId != null;
+      final profile = ref
+          .read(layoutProfilesControllerProvider.notifier)
+          .forChannel(widget.channelLogin);
+      final globalBackend = ref.read(playerBackendControllerProvider);
+      final preferredBackend = profile.playerBackend ?? globalBackend;
+      final useNative =
+          !isClip &&
+          preferredBackend == PlayerBackend.nativeHls &&
+          !_forceEmbedFallback;
+      Duration? position;
+      if (useNative) {
+        position = _nativeKey.currentState?.currentPosition;
+      } else {
+        position = await _embedKey.currentState?.getCurrentPosition();
+      }
+      if (position == null) return;
+      final vodId = widget.vodId!;
+      final store = ref.read(vodProgressStoreProvider);
+      final saved = store.readPosition(vodId);
+      final duration = useNative
+          ? _nativeKey.currentState?.player.state.duration
+          : null;
+      if (duration != null &&
+          duration != Duration.zero &&
+          position > duration - const Duration(seconds: 10)) {
+        await store.clear(vodId);
+      } else if (saved == null || position > saved) {
+        await store.savePosition(vodId, position);
+      }
+    });
   }
 
   void _scheduleHistory() {
@@ -342,6 +396,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               initialQuality: quality,
               initialMuted: settings.videoMuted,
               initialVolume: settings.videoVolume,
+              resumePosition: _resumePosition,
+              initialPlaybackSpeed: settings.playbackSpeed,
               onFailed: _onNativeFailed,
               onQualities: (names) {
                 if (!mounted) return;
@@ -361,6 +417,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               initialQuality: quality,
               initialMuted: settings.videoMuted,
               initialVolume: settings.videoVolume,
+              resumePosition: _resumePosition,
+              initialPlaybackSpeed: settings.playbackSpeed,
               onEvent: _onPlayerEvent,
             ),
     );
@@ -456,6 +514,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     : Icons.volume_up_outlined,
               ),
             ),
+            IconButton(
+              tooltip: 'Share',
+              onPressed: () {
+                String url;
+                if (widget.clipId != null && widget.clipId!.isNotEmpty) {
+                  url = 'https://clips.twitch.tv/${widget.clipId}';
+                } else if (widget.vodId != null && widget.vodId!.isNotEmpty) {
+                  url = 'https://www.twitch.tv/videos/${widget.vodId}';
+                } else {
+                  url = 'https://www.twitch.tv/${widget.channelLogin}';
+                }
+                SharePlus.instance.share(ShareParams(text: url));
+              },
+              icon: const Icon(Icons.share_outlined),
+            ),
             if (_pipSupported)
               IconButton(
                 tooltip: 'Picture in picture',
@@ -471,6 +544,41 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                   PopupMenuItem(value: q, child: Text(q)),
               ],
               icon: const Icon(Icons.high_quality_outlined),
+            ),
+            PopupMenuButton<double>(
+              tooltip: 'Speed',
+              initialValue: settings.playbackSpeed,
+              onSelected: (speed) async {
+                await ref
+                    .read(settingsControllerProvider.notifier)
+                    .setPlaybackSpeed(speed);
+                await _nativeKey.currentState?.setPlaybackSpeed(speed);
+                await _embedKey.currentState?.setPlaybackSpeed(speed);
+              },
+              itemBuilder: (context) => [
+                for (final s in const [
+                  0.25,
+                  0.5,
+                  0.75,
+                  1.0,
+                  1.25,
+                  1.5,
+                  1.75,
+                  2.0,
+                ])
+                  PopupMenuItem(
+                    value: s,
+                    child: Text(
+                      s == 1.0 ? 'Normal' : '${s}x',
+                      style: TextStyle(
+                        fontWeight: settings.playbackSpeed == s
+                            ? FontWeight.w700
+                            : null,
+                      ),
+                    ),
+                  ),
+              ],
+              icon: const Icon(Icons.speed_outlined),
             ),
             IconButton(
               tooltip: 'Layout profile',

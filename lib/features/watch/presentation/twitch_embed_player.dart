@@ -40,6 +40,8 @@ class TwitchEmbedPlayer extends StatefulWidget {
     this.initialQuality = 'auto',
     this.initialMuted = false,
     this.initialVolume = 0.7,
+    this.resumePosition,
+    this.initialPlaybackSpeed = 1.0,
     this.onEvent,
   }) : assert(
          channelLogin != null || vodId != null || clipId != null,
@@ -52,6 +54,8 @@ class TwitchEmbedPlayer extends StatefulWidget {
   final String initialQuality;
   final bool initialMuted;
   final double initialVolume;
+  final Duration? resumePosition;
+  final double initialPlaybackSpeed;
   final ValueChanged<TwitchPlayerEvent>? onEvent;
 
   @override
@@ -63,6 +67,7 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
   var _ready = false;
   bool? _pendingMuted;
   double? _pendingVolume;
+  double? _pendingPlaybackSpeed;
 
   @override
   void initState() {
@@ -172,14 +177,17 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     if (_pendingMuted != null) {
       final muted = _pendingMuted!;
       _pendingMuted = null;
-      // ignore: discarded_futures
       setMuted(muted);
     }
     if (_pendingVolume != null) {
       final volume = _pendingVolume!;
       _pendingVolume = null;
-      // ignore: discarded_futures
       setVolume(volume);
+    }
+    if (_pendingPlaybackSpeed != null) {
+      final speed = _pendingPlaybackSpeed!;
+      _pendingPlaybackSpeed = null;
+      setPlaybackSpeed(speed);
     }
   }
 
@@ -215,6 +223,10 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
       'quality': widget.initialQuality,
       'muted': widget.initialMuted,
       'volume': widget.initialVolume,
+      if (widget.resumePosition != null)
+        'resumePosition': widget.resumePosition!.inSeconds,
+      if (widget.initialPlaybackSpeed != 1.0)
+        'playbackSpeed': widget.initialPlaybackSpeed,
     };
     final html = template.replaceFirst(
       '<body>',
@@ -262,6 +274,41 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     final clamped = (volume.clamp(0.0, 1.0)).toStringAsFixed(2);
     await controller.runJavaScript(
       'window.NiceTvSetVolume && NiceTvSetVolume($clamped);',
+    );
+  }
+
+  Future<void> seek(Duration position) async {
+    final controller = _controller;
+    if (controller == null) return;
+    if (!_ready) return;
+    await controller.runJavaScript(
+      'window.NiceTvSeek && NiceTvSeek(${position.inSeconds});',
+    );
+  }
+
+  Future<Duration?> getCurrentPosition() async {
+    final controller = _controller;
+    if (controller == null) return null;
+    if (!_ready) return null;
+    final result = await controller.runJavaScriptReturningResult(
+      'window.NiceTvGetCurrentTime && NiceTvGetCurrentTime();',
+    );
+    final value = result;
+    if (value is double) {
+      return Duration(seconds: value.toInt());
+    }
+    if (value is int) {
+      return Duration(seconds: value);
+    }
+    return null;
+  }
+
+  Future<void> setPlaybackSpeed(double speed) async {
+    final controller = _controller;
+    if (controller == null) return;
+    if (!_ready) return;
+    await controller.runJavaScript(
+      'window.NiceTvSetRate && NiceTvSetRate($speed);',
     );
   }
 
