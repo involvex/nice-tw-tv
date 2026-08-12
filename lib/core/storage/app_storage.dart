@@ -46,6 +46,8 @@ class SettingsStorage {
   static const discoveryLanguageKey = 'discovery_language';
   static const discoveryHideMatureKey = 'discovery_hide_mature';
   static const discoverySortOrderKey = 'discovery_sort_order';
+  static const videoVolumeKey = 'video_volume';
+  static const videoMutedKey = 'video_muted';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -88,4 +90,14 @@ class SettingsStorage {
 
   Future<void> setDiscoverySortOrder(String value) =>
       _prefs.setString(discoverySortOrderKey, value);
+
+  double get videoVolume => _prefs.getDouble(videoVolumeKey) ?? 0.7;
+
+  Future<void> setVideoVolume(double value) =>
+      _prefs.setDouble(videoVolumeKey, value);
+
+  bool get videoMuted => _prefs.getBool(videoMutedKey) ?? false;
+
+  Future<void> setVideoMuted(bool value) =>
+      _prefs.setBool(videoMutedKey, value);
 }

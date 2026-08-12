@@ -38,6 +38,8 @@ class TwitchEmbedPlayer extends StatefulWidget {
     this.vodId,
     this.clipId,
     this.initialQuality = 'auto',
+    this.initialMuted = false,
+    this.initialVolume = 0.7,
     this.onEvent,
   }) : assert(
          channelLogin != null || vodId != null || clipId != null,
@@ -48,6 +50,8 @@ class TwitchEmbedPlayer extends StatefulWidget {
   final String? vodId;
   final String? clipId;
   final String initialQuality;
+  final bool initialMuted;
+  final double initialVolume;
   final ValueChanged<TwitchPlayerEvent>? onEvent;
 
   @override
@@ -57,6 +61,8 @@ class TwitchEmbedPlayer extends StatefulWidget {
 class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
   WebViewController? _controller;
   var _ready = false;
+  bool? _pendingMuted;
+  double? _pendingVolume;
 
   @override
   void initState() {
@@ -147,6 +153,7 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
             final event = TwitchPlayerEvent.fromJson(json);
             if (event.type == 'ready' || event.type == 'playing') {
               _ready = true;
+              _flushPending();
             }
             widget.onEvent?.call(event);
           } on Object {
@@ -157,6 +164,23 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     _controller = controller;
     if (mounted) setState(() {});
     await _load(controller);
+  }
+
+  void _flushPending() {
+    final controller = _controller;
+    if (controller == null) return;
+    if (_pendingMuted != null) {
+      final muted = _pendingMuted!;
+      _pendingMuted = null;
+      // ignore: discarded_futures
+      setMuted(muted);
+    }
+    if (_pendingVolume != null) {
+      final volume = _pendingVolume!;
+      _pendingVolume = null;
+      // ignore: discarded_futures
+      setVolume(volume);
+    }
   }
 
   @override
@@ -172,6 +196,14 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
         _load(controller);
       }
     }
+    if (oldWidget.initialMuted != widget.initialMuted) {
+      // ignore: discarded_futures
+      setMuted(widget.initialMuted);
+    }
+    if (oldWidget.initialVolume != widget.initialVolume) {
+      // ignore: discarded_futures
+      setVolume(widget.initialVolume);
+    }
   }
 
   Future<void> _load(WebViewController controller) async {
@@ -181,6 +213,8 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
       if (widget.vodId != null) 'video': widget.vodId,
       if (widget.clipId != null) 'clip': widget.clipId,
       'quality': widget.initialQuality,
+      'muted': widget.initialMuted,
+      'volume': widget.initialVolume,
     };
     final html = template.replaceFirst(
       '<body>',
@@ -203,6 +237,31 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     if (controller == null) return;
     await controller.runJavaScript(
       'window.NiceTvGetQualities && NiceTvGetQualities();',
+    );
+  }
+
+  Future<void> setMuted(bool muted) async {
+    final controller = _controller;
+    if (controller == null) return;
+    if (!_ready) {
+      _pendingMuted = muted;
+      return;
+    }
+    await controller.runJavaScript(
+      'window.NiceTvSetMuted && NiceTvSetMuted($muted);',
+    );
+  }
+
+  Future<void> setVolume(double volume) async {
+    final controller = _controller;
+    if (controller == null) return;
+    if (!_ready) {
+      _pendingVolume = volume;
+      return;
+    }
+    final clamped = (volume.clamp(0.0, 1.0)).toStringAsFixed(2);
+    await controller.runJavaScript(
+      'window.NiceTvSetVolume && NiceTvSetVolume($clamped);',
     );
   }
 

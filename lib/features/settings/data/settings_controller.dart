@@ -13,6 +13,8 @@ class AppSettings {
     this.discoveryLanguage,
     this.discoveryHideMature = false,
     this.discoverySortOrder = 'viewerCount',
+    this.videoVolume = 0.7,
+    this.videoMuted = false,
   });
 
   final ThemeMode themeMode;
@@ -22,6 +24,8 @@ class AppSettings {
   final String? discoveryLanguage;
   final bool discoveryHideMature;
   final String discoverySortOrder;
+  final double videoVolume;
+  final bool videoMuted;
 
   Color get accent => Color(accentArgb);
 
@@ -33,6 +37,8 @@ class AppSettings {
     String? discoveryLanguage,
     bool? discoveryHideMature,
     String? discoverySortOrder,
+    double? videoVolume,
+    bool? videoMuted,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -42,6 +48,8 @@ class AppSettings {
       discoveryLanguage: discoveryLanguage ?? this.discoveryLanguage,
       discoveryHideMature: discoveryHideMature ?? this.discoveryHideMature,
       discoverySortOrder: discoverySortOrder ?? this.discoverySortOrder,
+      videoVolume: videoVolume ?? this.videoVolume,
+      videoMuted: videoMuted ?? this.videoMuted,
     );
   }
 
@@ -82,6 +90,8 @@ class SettingsController extends Notifier<AppSettings> {
       discoveryLanguage: storage.discoveryLanguage,
       discoveryHideMature: storage.discoveryHideMature,
       discoverySortOrder: storage.discoverySortOrder,
+      videoVolume: storage.videoVolume,
+      videoMuted: storage.videoMuted,
     );
   }
 
@@ -121,6 +131,16 @@ class SettingsController extends Notifier<AppSettings> {
   Future<void> setDiscoverySortOrder(String sortOrder) async {
     await ref.read(settingsStorageProvider).setDiscoverySortOrder(sortOrder);
     state = state.copyWith(discoverySortOrder: sortOrder);
+  }
+
+  Future<void> setVideoVolume(double volume) async {
+    await ref.read(settingsStorageProvider).setVideoVolume(volume);
+    state = state.copyWith(videoVolume: volume);
+  }
+
+  Future<void> setVideoMuted(bool muted) async {
+    await ref.read(settingsStorageProvider).setVideoMuted(muted);
+    state = state.copyWith(videoMuted: muted);
   }
 }
 

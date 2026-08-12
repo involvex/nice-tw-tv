@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
+import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
 
 class FollowingScreen extends ConsumerWidget {
@@ -12,6 +14,7 @@ class FollowingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider).value;
     final feed = ref.watch(followingFeedControllerProvider);
+    final categories = ref.watch(followedCategoriesProvider);
     final theme = Theme.of(context);
 
     if (auth?.isLoggedIn != true) {
@@ -42,68 +45,129 @@ class FollowingScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Following')),
-      body: RefreshIndicator(
-        onRefresh: () =>
-            ref.read(followingFeedControllerProvider.notifier).refresh(),
-        child: feed.isLoading && feed.streams.isEmpty
-            ? ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              )
-            : feed.error != null && feed.streams.isEmpty
-            ? ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _FollowedCategoriesStrip(categories: categories),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref
+                    .read(followingFeedControllerProvider.notifier)
+                    .refresh();
+                ref.invalidate(followedCategoriesProvider);
+              },
+              child: feed.isLoading && feed.streams.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 120),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    )
+                  : feed.error != null && feed.streams.isEmpty
+                  ? ListView(
                       children: [
-                        Text(feed.error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: () => ref
-                              .read(followingFeedControllerProvider.notifier)
-                              .refresh(),
-                          child: const Text('Retry'),
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            children: [
+                              Text(feed.error!, textAlign: TextAlign.center),
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: () => ref
+                                    .read(
+                                      followingFeedControllerProvider.notifier,
+                                    )
+                                    .refresh(),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
+                    )
+                  : feed.streams.isEmpty
+                  ? ListView(
+                      children: [
+                        SizedBox(
+                          height: 200,
+                          child: Center(
+                            child: Text(
+                              'No followed live channels right now.',
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      itemCount:
+                          feed.streams.length + (feed.cursor != null ? 1 : 0),
+                      separatorBuilder: (_, _) => const SizedBox(height: 14),
+                      itemBuilder: (context, index) {
+                        if (index >= feed.streams.length) {
+                          ref
+                              .read(followingFeedControllerProvider.notifier)
+                              .loadMore();
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return StreamCard(stream: feed.streams[index]);
+                      },
                     ),
-                  ),
-                ],
-              )
-            : feed.streams.isEmpty
-            ? ListView(
-                children: [
-                  SizedBox(
-                    height: 200,
-                    child: Center(
-                      child: Text(
-                        'No followed live channels right now.',
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: feed.streams.length + (feed.cursor != null ? 1 : 0),
-                separatorBuilder: (_, _) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  if (index >= feed.streams.length) {
-                    ref
-                        .read(followingFeedControllerProvider.notifier)
-                        .loadMore();
-                    return const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  return StreamCard(stream: feed.streams[index]);
-                },
-              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _FollowedCategoriesStrip extends StatelessWidget {
+  const _FollowedCategoriesStrip({required this.categories});
+
+  final AsyncValue<List<TwitchCategory>> categories;
+
+  @override
+  Widget build(BuildContext context) {
+    return categories.when(
+      loading: () => const SizedBox(
+        height: 52,
+        child: Center(child: LinearProgressIndicator()),
+      ),
+      error: (_, _) => const SizedBox(height: 8),
+      data: (list) {
+        if (list.isEmpty) return const SizedBox(height: 8);
+        return SizedBox(
+          height: 52,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            scrollDirection: Axis.horizontal,
+            itemCount: list.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final category = list[index];
+              return FilterChip(
+                label: Text(category.name),
+                selected: false,
+                avatar: category.boxArtUrl.isEmpty
+                    ? null
+                    : CircleAvatar(
+                        backgroundImage: CachedNetworkImageProvider(
+                          category.sizedBoxArt(width: 52, height: 72),
+                        ),
+                      ),
+                onSelected: (_) => context.push(
+                  '/category/${category.id}?name=${Uri.encodeComponent(category.name)}',
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

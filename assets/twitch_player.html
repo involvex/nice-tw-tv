@@ -68,7 +68,7 @@
         height: '100%',
         parent: ['twitch.tv'],
         autoplay: true,
-        muted: false,
+        muted: cfg.muted !== undefined ? cfg.muted : false,
       };
       if (channel) opts.channel = channel;
       if (video) opts.video = video;
@@ -78,6 +78,13 @@
       player.addEventListener(Twitch.Player.READY, function () {
         const qualities = qualityNames(player.getQualities());
         post({ type: 'ready', qualities: qualities, quality: player.getQuality() });
+        // Restore volume/muted from config after player is ready
+        if (cfg.muted !== undefined && cfg.muted) {
+          try { player.setMuted(true); } catch (e) {}
+        }
+        if (cfg.volume !== undefined) {
+          try { player.setVolume(cfg.volume); } catch (e) {}
+        }
         if (quality && quality !== 'auto') {
           try { player.setQuality(quality); } catch (e) {}
         }
@@ -90,6 +97,14 @@
           qualities: qualityNames(player.getQualities()),
         });
       });
+
+      window.NiceTvSetMuted = function (muted) {
+        try { player.setMuted(muted); } catch (e) {}
+      };
+
+      window.NiceTvSetVolume = function (vol) {
+        try { player.setVolume(vol); } catch (e) {}
+      };
 
       window.NiceTvSetQuality = function (q) {
         try {

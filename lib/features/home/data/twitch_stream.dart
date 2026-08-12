@@ -5,6 +5,7 @@ class TwitchStream {
     required this.userLogin,
     required this.userName,
     required this.gameName,
+    required this.gameId,
     required this.title,
     required this.viewerCount,
     required this.thumbnailUrl,
@@ -18,6 +19,7 @@ class TwitchStream {
   final String userLogin;
   final String userName;
   final String gameName;
+  final String gameId;
   final String title;
   final int viewerCount;
   final String thumbnailUrl;
@@ -32,6 +34,7 @@ class TwitchStream {
       userLogin: json['user_login'] as String? ?? '',
       userName: json['user_name'] as String? ?? '',
       gameName: json['game_name'] as String? ?? '',
+      gameId: json['game_id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       viewerCount: json['viewer_count'] as int? ?? 0,
       thumbnailUrl: json['thumbnail_url'] as String? ?? '',

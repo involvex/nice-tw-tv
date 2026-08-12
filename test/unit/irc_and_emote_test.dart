@@ -172,6 +172,7 @@ void main() {
         userLogin: login,
         userName: login,
         gameName: 'Game',
+        gameId: '',
         title: 'Live now',
         viewerCount: 10,
         thumbnailUrl: '',

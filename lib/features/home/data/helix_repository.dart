@@ -85,6 +85,7 @@ class HelixRepository {
         userLogin: json['broadcaster_login'] as String? ?? '',
         userName: json['display_name'] as String? ?? '',
         gameName: json['game_name'] as String? ?? '',
+        gameId: json['game_id'] as String? ?? '',
         title: json['title'] as String? ?? '',
         viewerCount: 0,
         thumbnailUrl: json['thumbnail_url'] as String? ?? '',
@@ -168,6 +169,55 @@ class HelixRepository {
     final data = response.data?['data'] as List<dynamic>? ?? [];
     if (data.isEmpty) return null;
     return TwitchChannelInfo.fromJson(data.first as Map<String, dynamic>);
+  }
+
+  Future<List<TwitchChannelInfo>> getChannelsByIds(
+    List<String> broadcasterIds,
+  ) async {
+    if (broadcasterIds.isEmpty) return const [];
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/channels',
+      queryParameters: {for (final id in broadcasterIds) 'broadcaster_id': id},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => TwitchChannelInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<TwitchCategory>> getGamesByIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final valid = ids.where((id) => id.isNotEmpty).toList();
+    if (valid.isEmpty) return const [];
+    final batches = <List<String>>[];
+    for (var i = 0; i < valid.length; i += 50) {
+      batches.add(valid.sublist(i, (i + 50).clamp(0, valid.length)));
+    }
+    final results = <TwitchCategory>[];
+    for (final batch in batches) {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/helix/games',
+        queryParameters: {'id': batch},
+      );
+      final data = response.data?['data'] as List<dynamic>? ?? [];
+      results.addAll(
+        data.map((e) => TwitchCategory.fromJson(e as Map<String, dynamic>)),
+      );
+    }
+    return results;
+  }
+
+  Future<List<TwitchCategory>> getFollowedCategories(String userId) async {
+    final followed = await getFollowedChannels(userId: userId, first: 100);
+    if (followed.isEmpty) return const [];
+    final broadcasterIds = followed.map((c) => c.id).toList();
+    final channels = await getChannelsByIds(broadcasterIds);
+    final gameIds = <String>{};
+    for (final ch in channels) {
+      if (ch.gameId.isNotEmpty) gameIds.add(ch.gameId);
+    }
+    if (gameIds.isEmpty) return const [];
+    return getGamesByIds(gameIds.toList());
   }
 
   Future<List<({String id, String login, String displayName})>>
@@ -494,6 +544,23 @@ final browseCategoriesProvider = FutureProvider<List<TwitchCategory>>((
   );
   return [...pinned, ...rest];
 });
+
+final followedCategoriesProvider =
+    FutureProvider.autoDispose<List<TwitchCategory>>((ref) async {
+      final auth = ref.watch(authControllerProvider).value;
+      if (auth?.isLoggedIn != true || auth?.userId == null) return const [];
+      final categories = await ref
+          .read(helixRepositoryProvider)
+          .getFollowedCategories(auth!.userId!);
+      final byId = <String, TwitchCategory>{};
+      for (final c in pinnedBrowseCategories) {
+        byId[c.id] = c;
+      }
+      for (final c in categories) {
+        byId[c.id] = c;
+      }
+      return byId.values.toList();
+    });
 
 class StreamFeedState {
   const StreamFeedState({

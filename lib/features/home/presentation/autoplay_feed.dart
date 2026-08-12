@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/watch/presentation/twitch_embed_player.dart';
 
 /// Full-screen vertical swipe feed with autoplay for the focused page.
@@ -55,17 +56,50 @@ class _AutoplayFeedState extends ConsumerState<AutoplayFeed> {
       itemBuilder: (context, index) {
         final stream = widget.streams[index];
         final active = index == _index;
-        return _AutoplayPage(stream: stream, active: active);
+        final settings = ref.watch(settingsControllerProvider);
+        return _AutoplayPage(
+          stream: stream,
+          active: active,
+          initialMuted: settings.videoMuted,
+          initialVolume: settings.videoVolume,
+        );
       },
     );
   }
 }
 
-class _AutoplayPage extends StatelessWidget {
-  const _AutoplayPage({required this.stream, required this.active});
+class _AutoplayPage extends ConsumerStatefulWidget {
+  const _AutoplayPage({
+    required this.stream,
+    required this.active,
+    required this.initialMuted,
+    required this.initialVolume,
+  });
 
   final TwitchStream stream;
   final bool active;
+  final bool initialMuted;
+  final double initialVolume;
+
+  @override
+  ConsumerState<_AutoplayPage> createState() => _AutoplayPageState();
+}
+
+class _AutoplayPageState extends ConsumerState<_AutoplayPage> {
+  final _playerKey = GlobalKey<TwitchEmbedPlayerState>();
+
+  Future<void> _toggleMute() async {
+    final settings = ref.read(settingsControllerProvider);
+    final nextMuted = !settings.videoMuted;
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .setVideoMuted(nextMuted);
+    if (widget.active) {
+      await _playerKey.currentState?.setMuted(nextMuted);
+    }
+    if (!mounted) return;
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,13 +111,37 @@ class _AutoplayPage extends StatelessWidget {
       children: [
         ColoredBox(
           color: Colors.black,
-          child: active
+          child: widget.active
               ? TwitchEmbedPlayer(
-                  key: ValueKey('autoplay-${stream.id}'),
-                  channelLogin: stream.userLogin,
+                  key: _playerKey,
+                  channelLogin: widget.stream.userLogin,
+                  initialMuted: widget.initialMuted,
+                  initialVolume: widget.initialVolume,
                 )
               : const SizedBox.expand(),
         ),
+        if (widget.active)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            right: 12,
+            child: Consumer(
+              builder: (context, ref, _) {
+                final muted = ref.watch(
+                  settingsControllerProvider.select((s) => s.videoMuted),
+                );
+                return IconButton(
+                  tooltip: muted ? 'Unmute' : 'Mute',
+                  icon: Icon(
+                    muted
+                        ? Icons.volume_off_outlined
+                        : Icons.volume_up_outlined,
+                    color: Colors.white,
+                  ),
+                  onPressed: _toggleMute,
+                );
+              },
+            ),
+          ),
         Positioned(
           left: 16,
           right: 16,
@@ -93,10 +151,10 @@ class _AutoplayPage extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () => context.push(
-                  '/profile/${stream.userLogin}?userId=${stream.userId}',
+                  '/profile/${widget.stream.userLogin}?userId=${widget.stream.userId}',
                 ),
                 child: Text(
-                  stream.userName,
+                  widget.stream.userName,
                   style: theme.textTheme.titleLarge?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -108,7 +166,7 @@ class _AutoplayPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                stream.title,
+                widget.stream.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyLarge?.copyWith(
@@ -118,7 +176,7 @@ class _AutoplayPage extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                stream.gameName,
+                widget.stream.gameName,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.white70,
                 ),
@@ -129,10 +187,10 @@ class _AutoplayPage extends StatelessWidget {
                   FilledButton.tonal(
                     onPressed: () {
                       final uri = Uri(
-                        path: '/watch/${stream.userLogin}',
+                        path: '/watch/${widget.stream.userLogin}',
                         queryParameters: {
-                          'title': stream.title,
-                          'userId': stream.userId,
+                          'title': widget.stream.title,
+                          'userId': widget.stream.userId,
                         },
                       );
                       context.push(uri.toString());

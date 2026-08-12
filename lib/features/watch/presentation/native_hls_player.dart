@@ -14,6 +14,8 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
     this.onFailed,
     this.onQualities,
     this.initialQuality,
+    this.initialMuted = false,
+    this.initialVolume = 0.7,
   }) : assert(
          channelLogin != null || vodId != null,
          'Provide channelLogin or vodId',
@@ -24,6 +26,8 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
   final ValueChanged<Object>? onFailed;
   final ValueChanged<List<String>>? onQualities;
   final String? initialQuality;
+  final bool initialMuted;
+  final double initialVolume;
 
   @override
   ConsumerState<NativeHlsPlayer> createState() => NativeHlsPlayerState();
@@ -37,6 +41,9 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   var _failureReported = false;
   HlsPlaylist? _playlist;
   String _activeQuality = 'auto';
+  double _volume = 0.7;
+  var _muted = false;
+  double _unmuteVolume = 0.7;
 
   Player get player => _player;
   String get activeQuality => _activeQuality;
@@ -86,7 +93,11 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
                 .where((v) => v.name == preferred && !v.isAudioOnly)
                 .firstOrNull;
       _activeQuality = target?.name ?? 'auto';
+      _volume = widget.initialVolume;
+      _muted = widget.initialMuted;
+      _unmuteVolume = widget.initialVolume;
       await _player.open(Media((target?.url ?? playlist.masterUrl).toString()));
+      await _player.setVolume(_muted ? 0 : _volume * 100);
       if (mounted) setState(() => _loading = false);
     } on Object catch (e) {
       if (mounted) {
@@ -120,6 +131,24 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   }
 
   Future<void> retry() => _open();
+
+  Future<void> setMuted(bool muted) async {
+    _muted = muted;
+    if (!muted) {
+      await _player.setVolume(_unmuteVolume * 100);
+    } else {
+      await _player.setVolume(0);
+    }
+  }
+
+  Future<void> setVolume(double volume) async {
+    _volume = volume.clamp(0.0, 1.0);
+    if (!_muted) {
+      await _player.setVolume(_volume * 100);
+    } else {
+      _unmuteVolume = _volume;
+    }
+  }
 
   @override
   void dispose() {

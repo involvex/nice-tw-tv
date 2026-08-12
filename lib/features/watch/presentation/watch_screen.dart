@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/chat/presentation/chat_panel.dart';
 import 'package:nice_tv/features/history/data/history_controller.dart';
 import 'package:nice_tv/features/history/data/history_entry.dart';
@@ -101,6 +102,30 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         .setVideoQuality(quality);
     await _embedKey.currentState?.setQuality(quality);
     await _nativeKey.currentState?.setQuality(quality);
+  }
+
+  Future<void> _toggleMute() async {
+    final settings = ref.read(settingsControllerProvider);
+    final nextMuted = !settings.videoMuted;
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .setVideoMuted(nextMuted);
+    final profile = ref
+        .read(layoutProfilesControllerProvider.notifier)
+        .forChannel(widget.channelLogin);
+    final isClip = widget.clipId != null;
+    final globalBackend = ref.read(playerBackendControllerProvider);
+    final preferredBackend = profile.playerBackend ?? globalBackend;
+    final useNative =
+        !isClip &&
+        preferredBackend == PlayerBackend.nativeHls &&
+        !_forceEmbedFallback;
+    if (useNative) {
+      await _nativeKey.currentState?.setMuted(nextMuted);
+    } else {
+      await _embedKey.currentState?.setMuted(nextMuted);
+    }
+    setState(() {});
   }
 
   Future<void> _saveProfile(StreamerLayoutProfile profile) async {
@@ -292,6 +317,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         profiles[widget.channelLogin.toLowerCase()] ??
         const StreamerLayoutProfile();
     final globalBackend = ref.watch(playerBackendControllerProvider);
+    final settings = ref.watch(settingsControllerProvider);
     final preferredBackend = profile.playerBackend ?? globalBackend;
     final isClip = widget.clipId != null;
     final useNative =
@@ -314,6 +340,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               channelLogin: widget.vodId == null ? widget.channelLogin : null,
               vodId: widget.vodId,
               initialQuality: quality,
+              initialMuted: settings.videoMuted,
+              initialVolume: settings.videoVolume,
               onFailed: _onNativeFailed,
               onQualities: (names) {
                 if (!mounted) return;
@@ -331,6 +359,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               vodId: widget.vodId,
               clipId: widget.clipId,
               initialQuality: quality,
+              initialMuted: settings.videoMuted,
+              initialVolume: settings.videoVolume,
               onEvent: _onPlayerEvent,
             ),
     );
@@ -410,6 +440,22 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                   );
                 },
               ),
+            IconButton(
+              tooltip: 'View profile',
+              onPressed: () => context.push(
+                '/profile/${widget.channelLogin}?userId=${widget.broadcasterId}',
+              ),
+              icon: const Icon(Icons.person_outline),
+            ),
+            IconButton(
+              tooltip: settings.videoMuted ? 'Unmute' : 'Mute',
+              onPressed: _toggleMute,
+              icon: Icon(
+                settings.videoMuted
+                    ? Icons.volume_off_outlined
+                    : Icons.volume_up_outlined,
+              ),
+            ),
             if (_pipSupported)
               IconButton(
                 tooltip: 'Picture in picture',
