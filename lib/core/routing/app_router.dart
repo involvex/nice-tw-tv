@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/presentation/login_screen.dart';
 import 'package:nice_tv/features/history/data/history_controller.dart';
 import 'package:nice_tv/features/history/presentation/history_screen.dart';
-import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
+import 'package:nice_tv/features/home/presentation/category_browse_screen.dart';
 import 'package:nice_tv/features/home/presentation/following_screen.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
 import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
@@ -87,7 +87,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final name = state.uri.queryParameters['name'] ?? 'Category';
-          return CategoryStreamsScreen(gameId: id, name: name);
+          return CategoryBrowseScreen(gameId: id, name: name);
         },
       ),
       GoRoute(
