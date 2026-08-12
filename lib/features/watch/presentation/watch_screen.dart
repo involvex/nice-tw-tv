@@ -336,87 +336,93 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       densityOverride: profile.chatDensity,
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.clipId != null
-                  ? 'Clip'
-                  : widget.vodId != null
-                  ? 'VOD'
-                  : widget.channelLogin,
-            ),
-            if (widget.title != null)
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        // Allow default pop behavior
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                widget.title!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+                widget.clipId != null
+                    ? 'Clip'
+                    : widget.vodId != null
+                    ? 'VOD'
+                    : widget.channelLogin,
               ),
+              if (widget.title != null)
+                Text(
+                  widget.title!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+            ],
+          ),
+          actions: [
+            if (_pipSupported)
+              IconButton(
+                tooltip: 'Picture in picture',
+                onPressed: () => PipService.enter(),
+                icon: const Icon(Icons.picture_in_picture_alt_outlined),
+              ),
+            PopupMenuButton<String>(
+              tooltip: 'Quality',
+              initialValue: _activeQuality ?? quality,
+              onSelected: _setQuality,
+              itemBuilder: (context) => [
+                for (final q in _qualities)
+                  PopupMenuItem(value: q, child: Text(q)),
+              ],
+              icon: const Icon(Icons.high_quality_outlined),
+            ),
+            IconButton(
+              tooltip: 'Layout profile',
+              onPressed: _openLayoutSheet,
+              icon: const Icon(Icons.dashboard_customize_outlined),
+            ),
+            IconButton(
+              tooltip: showChat ? 'Hide chat' : 'Show chat',
+              onPressed: () async {
+                final next = showChat
+                    ? ChatPlacement.hidden
+                    : (isLandscape ? ChatPlacement.side : ChatPlacement.bottom);
+                await _saveProfile(profile.copyWith(chatPlacement: next));
+                setState(() {});
+              },
+              icon: Icon(
+                showChat ? Icons.chat_bubble : Icons.chat_bubble_outline,
+              ),
+            ),
           ],
         ),
-        actions: [
-          if (_pipSupported)
-            IconButton(
-              tooltip: 'Picture in picture',
-              onPressed: () => PipService.enter(),
-              icon: const Icon(Icons.picture_in_picture_alt_outlined),
-            ),
-          PopupMenuButton<String>(
-            tooltip: 'Quality',
-            initialValue: _activeQuality ?? quality,
-            onSelected: _setQuality,
-            itemBuilder: (context) => [
-              for (final q in _qualities)
-                PopupMenuItem(value: q, child: Text(q)),
-            ],
-            icon: const Icon(Icons.high_quality_outlined),
-          ),
-          IconButton(
-            tooltip: 'Layout profile',
-            onPressed: _openLayoutSheet,
-            icon: const Icon(Icons.dashboard_customize_outlined),
-          ),
-          IconButton(
-            tooltip: showChat ? 'Hide chat' : 'Show chat',
-            onPressed: () async {
-              final next = showChat
-                  ? ChatPlacement.hidden
-                  : (isLandscape ? ChatPlacement.side : ChatPlacement.bottom);
-              await _saveProfile(profile.copyWith(chatPlacement: next));
-              setState(() {});
-            },
-            icon: Icon(
-              showChat ? Icons.chat_bubble : Icons.chat_bubble_outline,
-            ),
-          ),
-        ],
-      ),
-      body: forceSide && showChat
-          ? Row(
-              children: [
-                Expanded(flex: videoFlex, child: player),
-                Expanded(
-                  flex: chatFlex,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(color: theme.dividerColor),
+        body: forceSide && showChat
+            ? Row(
+                children: [
+                  Expanded(flex: videoFlex, child: player),
+                  Expanded(
+                    flex: chatFlex,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          left: BorderSide(color: theme.dividerColor),
+                        ),
                       ),
+                      child: chat,
                     ),
-                    child: chat,
                   ),
-                ),
-              ],
-            )
-          : Column(
-              children: [
-                player,
-                if (showChat) Expanded(child: chat),
-              ],
-            ),
+                ],
+              )
+            : Column(
+                children: [
+                  player,
+                  if (showChat) Expanded(child: chat),
+                ],
+              ),
+      ),
     );
   }
 }
