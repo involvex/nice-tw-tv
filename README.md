@@ -60,3 +60,14 @@ flutter test
 ```
 
 Smoke on device: sign in, Following tab, watch + chat send, notifications inbox after a followed channel goes live, native HLS failure falls back to embed.
+
+## Support
+
+If you find Nice TV useful, consider supporting the project:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_me_a_coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/involvex)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/involvex)
+[![GitHub Sponsor](https://img.shields.io/badge/GitHub_Sponsors-28a745?style=for-the-badge&logo=github&logoColor=white)](https://github.com/involvex/nice-tw-tv?show=sponsor)
+[![OpenCode](https://img.shields.io/badge/OpenCode-6366f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDMi40OCAyIDIgNS40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LTggOCAzLjU5IDggOC0zLjU5IDgtOCA4eiIvPjwvc3ZnPg==&logoColor=white)](https://opencode.ai/go?ref=XS9FHCZT4C)
+[![Bing Rewards](https://img.shields.io/badge/Bing_Rewards-00809D?style=for-the-badge&logo=microsoft&logoColor=white)](https://rewards.bing.com/welcome?rh=14525F68&ref=rafsrchae&form=ML2XE3&OCID=ML2XE3&PUBL=RewardsDO&CREA=ML2XE3)
+

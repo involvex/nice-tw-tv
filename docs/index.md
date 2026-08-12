@@ -35,3 +35,13 @@ Modern Android-first Twitch client built with Flutter. Clean-room implementation
 - Live alerts: poll + EventSub WebSocket + local OS notifications
 - Light / dark / system themes with accent customization
 - Twitch OAuth (redirect `https://twitch.tv/login`)
+
+## Support
+
+If you find Nice TV useful, consider supporting the project:
+
+- [Buy Me a Coffee](https://buymeacoffee.com/involvex)
+- [PayPal](https://paypal.me/involvex)
+- [GitHub Sponsor](https://github.com/involvex/nice-tw-tv?show=sponsor)
+- [OpenCode](https://opencode.ai/go?ref=XS9FHCZT4C)
+- [Bing Rewards](https://rewards.bing.com/welcome?rh=14525F68&ref=rafsrchae&form=ML2XE3&OCID=ML2XE3&PUBL=RewardsDO&CREA=ML2XE3)
