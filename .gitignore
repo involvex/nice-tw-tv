@@ -125,3 +125,6 @@ app.*.symbols
 
 *.env
 .env
+
+# MkDocs build output
+site/

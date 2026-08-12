@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties
+
 android {
     namespace = "tv.nice.nice_tv"
     compileSdk = flutter.compileSdkVersion
@@ -34,9 +36,22 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (file("key.properties").exists()) {
+                val props = Properties()
+                file("key.properties").inputStream().use { stream ->
+                    props.load(stream)
+                }
+                val releaseSigning = signingConfigs.findByName("release")
+                    ?: signingConfigs.create("release")
+                releaseSigning.apply {
+                    storeFile = file(props["storeFile"] as String)
+                    storePassword = props["storePassword"] as String
+                    keyAlias = props["keyAlias"] as String
+                    keyPassword = props["keyPassword"] as String
+                }
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
