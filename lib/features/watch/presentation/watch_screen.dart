@@ -109,6 +109,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   }
 
   void _onPlayerEvent(TwitchPlayerEvent event) {
+    debugPrint(
+      'WatchScreen: _onPlayerEvent - type: ${event.type}, quality: ${event.quality}, qualities: ${event.qualities}, message: ${event.message}',
+    );
     if (event.qualities.isNotEmpty) {
       setState(() {
         _qualities = {
@@ -123,6 +126,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   }
 
   void _onNativeFailed(Object error) {
+    debugPrint('WatchScreen: _onNativeFailed - error: $error');
     if (!mounted || _forceEmbedFallback) return;
     setState(() => _forceEmbedFallback = true);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -339,7 +343,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
-        // Allow default pop behavior
+        debugPrint(
+          'WatchScreen: PopScope onPopInvokedWithResult - didPop: $didPop, result: $result',
+        );
       },
       child: Scaffold(
         appBar: AppBar(
