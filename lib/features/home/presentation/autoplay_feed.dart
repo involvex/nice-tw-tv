@@ -149,6 +149,10 @@ class _AutoplayPage extends StatelessWidget {
   }
 }
 
+/// @deprecated Use [CategoryBrowseScreen] instead which provides the same
+/// card-based infinite scroll layout as the frontpage.
+/// This class will be removed in a future version.
+@Deprecated('Use CategoryBrowseScreen instead')
 class CategoryStreamsScreen extends ConsumerStatefulWidget {
   const CategoryStreamsScreen({
     super.key,

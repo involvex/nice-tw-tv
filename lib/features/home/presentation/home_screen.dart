@@ -363,6 +363,10 @@ class _CategoryChips extends ConsumerWidget {
                         notifier.select(null);
                       } else {
                         notifier.select(category);
+                        // Navigate to dedicated category browse screen
+                        context.push(
+                          '/category/${category.id}?name=${Uri.encodeComponent(category.name)}',
+                        );
                       }
                     },
                   ),
