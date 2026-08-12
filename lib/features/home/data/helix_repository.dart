@@ -199,6 +199,44 @@ class HelixRepository {
     return users.where((u) => u.id.isNotEmpty).toList();
   }
 
+  Future<void> followChannel({
+    required String userId,
+    required String broadcasterId,
+  }) async {
+    await _dio.post(
+      '/helix/channels/followed',
+      data: {'user_id': userId, 'broadcaster_id': broadcasterId},
+    );
+  }
+
+  Future<void> unfollowChannel({
+    required String userId,
+    required String broadcasterId,
+  }) async {
+    await _dio.delete(
+      '/helix/channels/followed',
+      data: {'user_id': userId, 'broadcaster_id': broadcasterId},
+    );
+  }
+
+  Future<StreamsPage> getSimilarStreams({
+    required String gameId,
+    required String excludeUserId,
+    int first = 10,
+  }) async {
+    if (gameId.isEmpty) return const StreamsPage(streams: []);
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/streams',
+      queryParameters: {'game_id': gameId, 'first': first + 5},
+    );
+    final page = _parseStreamsPage(response.data!);
+    final filtered = page.streams
+        .where((s) => s.userId != excludeUserId)
+        .take(first)
+        .toList();
+    return StreamsPage(streams: filtered, cursor: page.cursor);
+  }
+
   Future<void> createEventSubSubscription({
     required String type,
     required String version,

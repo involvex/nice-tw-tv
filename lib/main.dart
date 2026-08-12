@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:nice_tv/core/env/app_env.dart';
 import 'package:nice_tv/core/routing/app_router.dart';
 import 'package:nice_tv/core/theme/nice_tv_theme.dart';
+import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,11 +23,23 @@ Future<void> main() async {
   );
 }
 
-class NiceTvApp extends ConsumerWidget {
+class NiceTvApp extends ConsumerStatefulWidget {
   const NiceTvApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NiceTvApp> createState() => _NiceTvAppState();
+}
+
+class _NiceTvAppState extends ConsumerState<NiceTvApp> {
+  @override
+  void initState() {
+    super.initState();
+    // ignore: discarded_futures
+    Future.microtask(() => ref.read(notificationsInboxProvider));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsControllerProvider);
     final router = ref.watch(goRouterProvider);
 

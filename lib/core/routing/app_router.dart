@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/presentation/login_screen.dart';
-import 'package:nice_tv/features/history/data/history_controller.dart';
 import 'package:nice_tv/features/history/presentation/history_screen.dart';
 import 'package:nice_tv/features/home/presentation/category_autoplay_feed.dart';
 import 'package:nice_tv/features/home/presentation/category_browse_screen.dart';
 import 'package:nice_tv/features/home/presentation/following_screen.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
-import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 import 'package:nice_tv/features/notifications/presentation/notifications_screen.dart';
 import 'package:nice_tv/features/profile/presentation/channel_profile_screen.dart';
 import 'package:nice_tv/features/search/presentation/search_screen.dart';
@@ -17,8 +15,6 @@ import 'package:nice_tv/features/vod/presentation/vod_screen.dart';
 import 'package:nice_tv/features/watch/presentation/watch_screen.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  ref.watch(notificationsInboxProvider);
-  ref.watch(historyControllerProvider);
   return GoRouter(
     initialLocation: '/',
     routes: [

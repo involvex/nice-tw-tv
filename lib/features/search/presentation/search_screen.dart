@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/search/data/search_history_controller.dart';
 
 class SearchQuery {
   const SearchQuery(this.value);
@@ -56,12 +57,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _submit(String value) {
-    setState(() => _query = SearchQuery(value.trim()));
+    final trimmed = value.trim();
+    if (trimmed.isNotEmpty) {
+      ref.read(searchHistoryControllerProvider.notifier).addQuery(trimmed);
+    }
+    setState(() => _query = SearchQuery(trimmed));
   }
 
   @override
   Widget build(BuildContext context) {
     final results = ref.watch(searchResultsProvider(_query));
+    final history = ref.watch(searchHistoryControllerProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -78,6 +84,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
         actions: [
+          if (_query.value.isNotEmpty)
+            IconButton(
+              tooltip: 'Clear query',
+              onPressed: () {
+                _controller.clear();
+                _submit('');
+              },
+              icon: const Icon(Icons.close),
+            ),
           IconButton(
             onPressed: () => _submit(_controller.text),
             icon: const Icon(Icons.search),
@@ -91,6 +106,38 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
+              if (_query.value.isEmpty && history.isNotEmpty) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Recent searches', style: theme.textTheme.titleMedium),
+                    TextButton(
+                      onPressed: () => ref
+                          .read(searchHistoryControllerProvider.notifier)
+                          .clearAll(),
+                      child: const Text('Clear all'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: history.map((item) {
+                    return InputChip(
+                      label: Text(item),
+                      onPressed: () {
+                        _controller.text = item;
+                        _submit(item);
+                      },
+                      onDeleted: () => ref
+                          .read(searchHistoryControllerProvider.notifier)
+                          .removeQuery(item),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+              ],
               Text(
                 _query.value.isEmpty ? 'Popular categories' : 'Categories',
                 style: theme.textTheme.titleMedium,

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/chat/presentation/chat_panel.dart';
 import 'package:nice_tv/features/history/data/history_controller.dart';
 import 'package:nice_tv/features/history/data/history_entry.dart';
+import 'package:nice_tv/features/profile/data/follow_controller.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/watch/data/pip_service.dart';
@@ -369,6 +370,46 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
             ],
           ),
           actions: [
+            if (widget.broadcasterId != null)
+              Consumer(
+                builder: (context, ref, _) {
+                  final followState = ref.watch(
+                    followControllerProvider(widget.broadcasterId!),
+                  );
+                  final isFollowing = followState.value?.isFollowing ?? false;
+                  final isLoading = followState.value?.isLoading ?? false;
+                  return IconButton(
+                    tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                    onPressed: isLoading
+                        ? null
+                        : () async {
+                            try {
+                              await ref
+                                  .read(
+                                    followControllerProvider(
+                                      widget.broadcasterId!,
+                                    ).notifier,
+                                  )
+                                  .toggle();
+                            } on Object catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to update follow: $e',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                    icon: Icon(
+                      isFollowing ? Icons.favorite : Icons.favorite_border,
+                      color: isFollowing ? Colors.red : null,
+                    ),
+                  );
+                },
+              ),
             if (_pipSupported)
               IconButton(
                 tooltip: 'Picture in picture',

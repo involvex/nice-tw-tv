@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/profile/data/follow_controller.dart';
+import 'package:nice_tv/features/profile/presentation/similar_streams_shelf.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
 
 class ChannelProfileArgs {
@@ -139,33 +141,83 @@ class ChannelProfileScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    IconButton.filledTonal(
-                                      tooltip: 'Notifications',
-                                      onPressed: () =>
-                                          context.push('/notifications'),
-                                      icon: const Icon(
-                                        Icons.notifications_outlined,
-                                      ),
-                                    ),
-                                    if (data.live != null) ...[
-                                      const SizedBox(width: 8),
-                                      FilledButton(
-                                        onPressed: () {
-                                          final uri = Uri(
-                                            path: '/watch/${user.login}',
-                                            queryParameters: {
-                                              'title': data.live!.title,
-                                              'userId': user.id,
+                                Consumer(
+                                  builder: (context, ref, _) {
+                                    final followState = ref.watch(
+                                      followControllerProvider(user.id),
+                                    );
+                                    final isFollowing =
+                                        followState.value?.isFollowing ?? false;
+                                    final isLoading =
+                                        followState.value?.isLoading ?? false;
+
+                                    return Row(
+                                      children: [
+                                        FilledButton.icon(
+                                          onPressed: isLoading
+                                              ? null
+                                              : () async {
+                                                  try {
+                                                    await ref
+                                                        .read(
+                                                          followControllerProvider(
+                                                            user.id,
+                                                          ).notifier,
+                                                        )
+                                                        .toggle();
+                                                  } on Object catch (e) {
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                            'Failed to update follow: $e',
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  }
+                                                },
+                                          icon: Icon(
+                                            isFollowing
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                          ),
+                                          label: Text(
+                                            isFollowing
+                                                ? 'Following'
+                                                : 'Follow',
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton.filledTonal(
+                                          tooltip: 'Notifications',
+                                          onPressed: () =>
+                                              context.push('/notifications'),
+                                          icon: const Icon(
+                                            Icons.notifications_outlined,
+                                          ),
+                                        ),
+                                        if (data.live != null) ...[
+                                          const SizedBox(width: 8),
+                                          FilledButton(
+                                            onPressed: () {
+                                              final uri = Uri(
+                                                path: '/watch/${user.login}',
+                                                queryParameters: {
+                                                  'title': data.live!.title,
+                                                  'userId': user.id,
+                                                },
+                                              );
+                                              context.push(uri.toString());
                                             },
-                                          );
-                                          context.push(uri.toString());
-                                        },
-                                        child: const Text('Watch live'),
-                                      ),
-                                    ],
-                                  ],
+                                            child: const Text('Watch live'),
+                                          ),
+                                        ],
+                                      ],
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -191,6 +243,12 @@ class ChannelProfileScreen extends ConsumerWidget {
                         Text(
                           user.description,
                           style: theme.textTheme.bodyMedium,
+                        ),
+                      if (data.channel != null &&
+                          data.channel!.gameId.isNotEmpty)
+                        SimilarStreamsShelf(
+                          gameId: data.channel!.gameId,
+                          excludeUserId: user.id,
                         ),
                       const SizedBox(height: 24),
                       Text('Recent VODs', style: theme.textTheme.titleMedium),
