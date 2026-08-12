@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
@@ -77,7 +78,18 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.name)),
+      appBar: AppBar(
+        title: Text(widget.name),
+        actions: [
+          IconButton(
+            tooltip: 'Autoplay feed',
+            onPressed: () => context.push(
+              '/category/${widget.gameId}/autoplay?name=${Uri.encodeComponent(widget.name)}',
+            ),
+            icon: const Icon(Icons.swipe_vertical),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _onRefresh,
         child: _loading && _streams.isEmpty
