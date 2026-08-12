@@ -68,12 +68,34 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
+      ..enableZoom(false)
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) {
-            // Block any navigation away from the Twitch embed
-            // Allow all twitch.tv subdomains, embed.twitch.tv, and safe schemes
+            // Block main frame navigation away from Twitch domains
+            // Allow iframe navigations (ads) to prevent embed breakage
+            // Note: isForMainFrame not available in this version, so we allow all
+            // iframe-like URLs (common ad domains) while blocking main frame redirects
             final url = request.url;
+
+            // Allow known ad/analytics domains that load in iframes
+            final isLikelyIframeContent =
+                url.contains('googleads.g.doubleclick.net') ||
+                url.contains('googlesyndication.com') ||
+                url.contains('google-analytics.com') ||
+                url.contains('googletagmanager.com') ||
+                url.contains('doubleclick.net') ||
+                url.contains('ads.twitch.tv') ||
+                url.contains('ttv-api.twitch.tv') ||
+                url.contains('api.twitch.tv') ||
+                url.contains('usher.ttvnw.net') ||
+                url.contains('passport.twitch.tv') ||
+                url.contains('sso.twitch.tv') ||
+                url.contains('id.twitch.tv') ||
+                url.contains('assets.twitch.tv') ||
+                url.contains('extensions.twitch.tv');
+
+            // Allow all twitch.tv subdomains, embed.twitch.tv, and safe schemes
             final isTwitchDomain =
                 url.startsWith('https://') &&
                 (url.contains('.twitch.tv/') ||
@@ -81,6 +103,7 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
                     url.contains('.ttvnw.net/'));
             final allowed =
                 isTwitchDomain ||
+                isLikelyIframeContent ||
                 url.startsWith('https://embed.twitch.tv/') ||
                 url.startsWith('https://player.twitch.tv/') ||
                 url.startsWith('data:') ||
@@ -93,7 +116,7 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
                 url.startsWith('https://fonts.gstatic.com/');
             if (!allowed) {
               // Log blocked navigation for debugging
-              debugPrint('TwitchEmbedPlayer: Blocked WebView navigation: $url');
+              debugPrint('TwitchEmbedPlayer: Blocked navigation: $url');
             }
             return allowed
                 ? NavigationDecision.navigate
