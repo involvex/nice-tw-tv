@@ -18,6 +18,7 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
     this.initialVolume = 0.7,
     this.resumePosition,
     this.initialPlaybackSpeed = 1.0,
+    this.externalPlayer,
   }) : assert(
          channelLogin != null || vodId != null,
          'Provide channelLogin or vodId',
@@ -32,6 +33,7 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
   final double initialVolume;
   final Duration? resumePosition;
   final double initialPlaybackSpeed;
+  final Player? externalPlayer;
 
   @override
   ConsumerState<NativeHlsPlayer> createState() => NativeHlsPlayerState();
@@ -56,7 +58,7 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   @override
   void initState() {
     super.initState();
-    _player = Player();
+    _player = widget.externalPlayer ?? Player();
     _controller = VideoController(_player);
     WidgetsBinding.instance.addPostFrameCallback((_) => _open());
   }
@@ -180,7 +182,9 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
 
   @override
   void dispose() {
-    _player.dispose();
+    if (widget.externalPlayer == null) {
+      _player.dispose();
+    }
     super.dispose();
   }
 

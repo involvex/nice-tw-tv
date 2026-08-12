@@ -24,6 +24,12 @@ final homeBrowseTabProvider =
       HomeBrowseTabController.new,
     );
 
+final homeScrollControllerProvider = Provider<ScrollController>((ref) {
+  final controller = ScrollController();
+  ref.onDispose(controller.dispose);
+  return controller;
+});
+
 class HomeFeedModeController extends Notifier<HomeFeedMode> {
   static const _key = 'home_feed_mode';
 
@@ -123,6 +129,7 @@ class HomeScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: onRefresh,
         child: CustomScrollView(
+          controller: ref.watch(homeScrollControllerProvider),
           slivers: [
             SliverAppBar(
               pinned: true,

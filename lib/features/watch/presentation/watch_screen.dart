@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/routing/app_router.dart';
 import 'package:nice_tv/features/chat/presentation/chat_panel.dart';
 import 'package:nice_tv/features/history/data/history_controller.dart';
 import 'package:nice_tv/features/history/data/history_entry.dart';
@@ -11,6 +12,8 @@ import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/vod/data/vod_progress_store.dart';
 import 'package:nice_tv/features/watch/data/pip_service.dart';
+import 'package:nice_tv/features/watch/data/mini_player_player_provider.dart';
+import 'package:nice_tv/features/watch/data/player_overlay_controller.dart';
 import 'package:nice_tv/features/watch/presentation/native_hls_player.dart';
 import 'package:nice_tv/features/watch/presentation/twitch_embed_player.dart';
 import 'package:share_plus/share_plus.dart';
@@ -36,7 +39,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
 }
 
-class _WatchScreenState extends ConsumerState<WatchScreen> {
+class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
   final _embedKey = GlobalKey<TwitchEmbedPlayerState>();
   final _nativeKey = GlobalKey<NativeHlsPlayerState>();
   var _qualities = <String>['auto'];
@@ -46,6 +49,84 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   Timer? _historyTimer;
   Timer? _positionTimer;
   Duration? _resumePosition;
+  bool _miniplayerCollapsed = false;
+  bool _routeSubscribed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_routeSubscribed) {
+      final route = ModalRoute.of(context);
+      if (route is PageRoute) {
+        routeObserver.subscribe(this, route);
+        _routeSubscribed = true;
+      }
+    }
+    final stream = ref.read(miniPlayerControllerProvider);
+    if (stream != null &&
+        stream.channelLogin == widget.channelLogin &&
+        stream.vodId == widget.vodId &&
+        stream.clipId == widget.clipId) {
+      ref.read(miniPlayerControllerProvider.notifier).close();
+    }
+  }
+
+  @override
+  void didPushNext() {
+    _collapseToMiniplayer();
+  }
+
+  @override
+  void didPop() {
+    _collapseToMiniplayer();
+  }
+
+  Future<void> _collapseToMiniplayer() async {
+    if (_miniplayerCollapsed) return;
+    _miniplayerCollapsed = true;
+    final isClip = widget.clipId != null;
+    final profile = ref
+        .read(layoutProfilesControllerProvider.notifier)
+        .forChannel(widget.channelLogin);
+    final globalBackend = ref.read(playerBackendControllerProvider);
+    final preferredBackend = profile.playerBackend ?? globalBackend;
+    final useNative =
+        !isClip &&
+        preferredBackend == PlayerBackend.nativeHls &&
+        !_forceEmbedFallback;
+    Duration? position;
+    if (useNative) {
+      position = _nativeKey.currentState?.currentPosition;
+    } else {
+      position = await _embedKey.currentState?.getCurrentPosition();
+    }
+    ref
+        .read(miniPlayerControllerProvider.notifier)
+        .start(
+          ActiveStream(
+            channelLogin: widget.channelLogin,
+            title: widget.title,
+            broadcasterId: widget.broadcasterId,
+            vodId: widget.vodId,
+            clipId: widget.clipId,
+            backend: preferredBackend,
+            forceEmbedFallback: _forceEmbedFallback,
+            initialQuality:
+                _activeQuality ??
+                profile.preferredQuality ??
+                ref.read(settingsControllerProvider).videoQuality,
+            initialMuted: ref.read(settingsControllerProvider).videoMuted,
+            initialVolume: ref.read(settingsControllerProvider).videoVolume,
+            resumePosition: position,
+            initialPlaybackSpeed: ref
+                .read(settingsControllerProvider)
+                .playbackSpeed,
+          ),
+        );
+    if (_pipSupported) {
+      PipService.enter();
+    }
+  }
 
   @override
   void initState() {
@@ -69,6 +150,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _historyTimer?.cancel();
     _positionTimer?.cancel();
     super.dispose();
@@ -391,6 +473,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       child: useNative
           ? NativeHlsPlayer(
               key: _nativeKey,
+              externalPlayer: ref.read(miniPlayerMediaKitPlayerProvider),
               channelLogin: widget.vodId == null ? widget.channelLogin : null,
               vodId: widget.vodId,
               initialQuality: quality,

@@ -12,11 +12,15 @@ import 'package:nice_tv/features/profile/presentation/channel_profile_screen.dar
 import 'package:nice_tv/features/search/presentation/search_screen.dart';
 import 'package:nice_tv/features/settings/presentation/settings_screen.dart';
 import 'package:nice_tv/features/vod/presentation/vod_screen.dart';
+import 'package:nice_tv/features/watch/presentation/mini_player.dart';
 import 'package:nice_tv/features/watch/presentation/watch_screen.dart';
+
+final routeObserver = RouteObserver<ModalRoute<void>>();
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
+    observers: [routeObserver],
     routes: [
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -136,18 +140,47 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class _MainShell extends StatelessWidget {
+class _MainShell extends ConsumerWidget {
   const _MainShell({required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final navBarHeight =
+        NavigationBarTheme.of(context).height ?? kBottomNavigationBarHeight;
     return Scaffold(
-      body: navigationShell,
+      body: Stack(
+        children: [
+          navigationShell,
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: navBarHeight + 8),
+              child: const MiniPlayer(),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: navigationShell.goBranch,
+        onDestinationSelected: (index) {
+          if (index == navigationShell.currentIndex) {
+            final location = GoRouterState.of(context).uri.path;
+            if (index == 0 && location == '/') {
+              final controller = ref.read(homeScrollControllerProvider);
+              if (controller.hasClients) {
+                controller.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+              return;
+            }
+          }
+          navigationShell.goBranch(index);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.live_tv_outlined),
