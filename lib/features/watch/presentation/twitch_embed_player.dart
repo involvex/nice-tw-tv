@@ -72,18 +72,40 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
         NavigationDelegate(
           onNavigationRequest: (request) {
             // Block any navigation away from the Twitch embed
-            // Allow only twitch.tv and the initial HTML load
+            // Allow only twitch.tv, embed.twitch.tv, and safe schemes
             final url = request.url;
-            if (url.startsWith('https://twitch.tv/') ||
+            final allowed =
+                url.startsWith('https://twitch.tv/') ||
                 url.startsWith('https://embed.twitch.tv/') ||
+                url.startsWith('https://player.twitch.tv/') ||
+                url.startsWith('https://static.twitchcdn.net/') ||
+                url.startsWith('https://ttv-api.twitch.tv/') ||
                 url.startsWith('data:') ||
                 url.startsWith('blob:') ||
                 url.startsWith('about:') ||
-                url.startsWith('file:')) {
-              return NavigationDecision.navigate;
+                url.startsWith('file:') ||
+                url.startsWith('javascript:') ||
+                url.startsWith('https://www.google.com/') ||
+                url.startsWith('https://fonts.googleapis.com/') ||
+                url.startsWith('https://fonts.gstatic.com/');
+            if (!allowed) {
+              // Log blocked navigation for debugging
+              debugPrint('TwitchEmbedPlayer: Blocked WebView navigation: $url');
             }
-            // Block all other navigation (ads, redirects, etc.)
-            return NavigationDecision.prevent;
+            return allowed
+                ? NavigationDecision.navigate
+                : NavigationDecision.prevent;
+          },
+          onPageStarted: (url) {
+            debugPrint('TwitchEmbedPlayer: WebView page started: $url');
+          },
+          onPageFinished: (url) {
+            debugPrint('TwitchEmbedPlayer: WebView page finished: $url');
+          },
+          onWebResourceError: (error) {
+            debugPrint(
+              'TwitchEmbedPlayer: WebView resource error: ${error.url} - ${error.description}',
+            );
           },
         ),
       )
