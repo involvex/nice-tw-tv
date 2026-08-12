@@ -68,6 +68,25 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (request) {
+            // Block any navigation away from the Twitch embed
+            // Allow only twitch.tv and the initial HTML load
+            final url = request.url;
+            if (url.startsWith('https://twitch.tv/') ||
+                url.startsWith('https://embed.twitch.tv/') ||
+                url.startsWith('data:') ||
+                url.startsWith('blob:') ||
+                url.startsWith('about:') ||
+                url.startsWith('file:')) {
+              return NavigationDecision.navigate;
+            }
+            // Block all other navigation (ads, redirects, etc.)
+            return NavigationDecision.prevent;
+          },
+        ),
+      )
       ..addJavaScriptChannel(
         'NiceTvPlayer',
         onMessageReceived: (message) {
