@@ -72,14 +72,17 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
         NavigationDelegate(
           onNavigationRequest: (request) {
             // Block any navigation away from the Twitch embed
-            // Allow only twitch.tv, embed.twitch.tv, and safe schemes
+            // Allow all twitch.tv subdomains, embed.twitch.tv, and safe schemes
             final url = request.url;
+            final isTwitchDomain =
+                url.startsWith('https://') &&
+                (url.contains('.twitch.tv/') ||
+                    url.contains('.twitchcdn.net/') ||
+                    url.contains('.ttvnw.net/'));
             final allowed =
-                url.startsWith('https://twitch.tv/') ||
+                isTwitchDomain ||
                 url.startsWith('https://embed.twitch.tv/') ||
                 url.startsWith('https://player.twitch.tv/') ||
-                url.startsWith('https://static.twitchcdn.net/') ||
-                url.startsWith('https://ttv-api.twitch.tv/') ||
                 url.startsWith('data:') ||
                 url.startsWith('blob:') ||
                 url.startsWith('about:') ||
@@ -185,6 +188,11 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
   }
 
   bool get isReady => _ready;
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
