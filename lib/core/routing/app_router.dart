@@ -124,6 +124,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             title: title,
             broadcasterId: userId,
             vodId: id,
+            thumbnailUrl: state.uri.queryParameters['thumbnailUrl'],
           );
         },
       ),

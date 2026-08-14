@@ -43,97 +43,84 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - `lib/features/chat/data/irc_message.dart`
 - `lib/features/chat/presentation/chat_panel.dart`
 
+### 1.6 Chat Polls & Predictions Display
+**Priority:** Low
+**Rationale:** Parse and render Twitch channel poll/prediction messages from IRC tags. Requires additional IRC tag parsing.
+**Affected files:**
+- `lib/features/chat/data/irc_message.dart`
+- `lib/features/chat/presentation/chat_panel.dart`
+
+### 1.7 Auto-Translate Chat
+**Priority:** Low
+**Rationale:** Integrate with a translation API (e.g., LibreTranslate) to auto-translate non-English chat messages.
+**Affected files:**
+- `lib/features/chat/presentation/chat_panel.dart`
+- New: `lib/features/chat/data/translation_service.dart`
+
 ---
 
 ## 2. Video Player Enhancements
 
-### 2.1 Playback Speed Control
-**Priority:** Medium
-**Rationale:** Twitch embed and native HLS players both support playback rate changes. Expose a 0.25x–2x speed selector in the watch screen.
-**Affected files:**
-- `lib/features/watch/presentation/watch_screen.dart`
-- `lib/features/watch/presentation/twitch_embed_player.dart`
-- `lib/features/watch/presentation/native_hls_player.dart`
+> **Note:** Playback speed control (0.25x–2x), quality selection, mute/unmute, volume, and VOD resume are already implemented.
 
-### 2.2 Theater Mode
+### 2.1 Theater Mode
 **Priority:** Low
 **Rationale:** Immersive full-width player with chat overlaid (or hidden). Useful on phones in landscape and on tablets.
 **Affected files:**
 - `lib/features/watch/presentation/watch_screen.dart`
 - `lib/features/settings/data/layout_profile.dart`
 
-### 2.3 Resume VOD from Last Position
-**Priority:** High
-**Rationale:** Store the last watched position per VOD in `SharedPreferences` and seek to it when opening the player.
-**Affected files:**
-- `lib/features/watch/presentation/watch_screen.dart`
-- `lib/features/watch/presentation/twitch_embed_player.dart`
-- `lib/features/watch/presentation/native_hls_player.dart`
-- New: `lib/features/vod/data/vod_progress_store.dart`
-
-### 2.4 Volume Boost / Audio Normalization
+### 2.2 Volume Boost / Audio Normalization
 **Priority:** Low
 **Rationale:** Some streams are too quiet. A software volume boost (up to 2x) via the native player would help.
 **Affected files:**
 - `lib/features/watch/presentation/native_hls_player.dart`
 - `lib/features/watch/presentation/watch_screen.dart`
 
+### 2.3 Stream Delay Indicator
+**Priority:** Low
+**Rationale:** Estimate and display current stream delay (Twitch low-latency vs. normal).
+**Affected files:**
+- `lib/features/watch/presentation/watch_screen.dart`
+
 ---
 
 ## 3. Stream Discovery & Organization
 
-### 3.1 Sort & Filter Controls
-**Priority:** High
-**Rationale:** Currently the home feed shows top streams. Add sorting (viewer count, recently started, alphabetically) and filtering (language, mature content).
-**Affected files:**
-- `lib/features/home/data/helix_repository.dart`
-- `lib/features/home/presentation/home_screen.dart`
-- `lib/features/home/data/twitch_stream.dart`
+> **Note:** Sort/filter controls (viewer count, recently started, alphabetical, language, mature), language filter, and watch history are already implemented.
 
-### 3.2 Mature Content Toggle
+### 3.1 Mature Content Toggle
 **Priority:** High
 **Rationale:** Respect Twitch's mature flag and add a global setting to hide mature streams.
-**Affected files:**
-- `lib/features/home/data/twitch_stream.dart`
-- `lib/features/home/data/helix_repository.dart`
-- `lib/features/settings/data/settings_controller.dart`
-- `lib/features/settings/presentation/settings_screen.dart`
+**Status:** Already implemented in `settings_controller.dart` (`discoveryHideMature`) and applied in `helix_repository.dart` (`applyDiscoveryFilters`).
 
-### 3.3 Language Filter
-**Priority:** Medium
-**Rationale:** Let users filter the browse and following feeds by language.
-**Affected files:**
-- `lib/features/home/data/helix_repository.dart`
-- `lib/features/home/presentation/home_screen.dart`
-
-### 3.4 Watch History
+### 3.2 Watch History
 **Priority:** High
 **Rationale:** Keep a local history of watched streams and VODs so users can jump back in.
-**Affected files:**
-- New: `lib/features/history/data/history_store.dart`
-- New: `lib/features/history/presentation/history_screen.dart`
-- `lib/core/routing/app_router.dart`
+**Status:** Already implemented via `lib/features/history/data/history_store.dart`, `history_controller.dart`, `history_screen.dart`, and route `/history`.
 
-### 3.5 Followed Channels Not Live Quick Filter
+### 3.3 Followed Channels Not Live Quick Filter
 **Priority:** Low
 **Rationale:** In the Following tab, show a small section of followed channels that are currently offline, with their last stream info.
 **Affected files:**
 - `lib/features/home/presentation/following_screen.dart`
 - `lib/features/home/data/helix_repository.dart`
 
+### 3.4 Continue Watching Shelf
+**Priority:** Medium
+**Rationale:** On the home screen or VOD tab, show VODs the user started but hasn't finished, with a resume button. The `VodProgressStore` already tracks positions; this feature would surface them.
+**Affected files:**
+- `lib/features/home/presentation/home_screen.dart`
+- `lib/features/vod/presentation/vod_screen.dart`
+- `lib/features/vod/data/vod_progress_store.dart` (already exists)
+
 ---
 
 ## 4. Channel Profile Enrichment
 
-### 4.1 Follow / Unfollow Button
-**Priority:** High
-**Rationale:** Currently the profile screen shows data but does not allow following/unfollowing a channel from the app. Expose the Helix `Follow`/`Unfollow` endpoints.
-**Affected files:**
-- `lib/features/profile/presentation/channel_profile_screen.dart`
-- `lib/features/home/data/helix_repository.dart`
-- `lib/features/auth/data/auth_repository.dart` (for scopes)
+> **Note:** Follow/unfollow is already implemented via `FollowController` and exposed in the profile and watch screens.
 
-### 4.2 Channel Panels & About Section
+### 4.1 Channel Panels & About Section
 **Priority:** Medium
 **Rationale:** Twitch channel profiles have panels (links, rules, etc.). Fetch and render them in `ChannelProfileScreen`.
 **Affected files:**
@@ -141,13 +128,21 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - `lib/features/home/data/helix_repository.dart`
 - `lib/features/home/data/twitch_models.dart`
 
-### 4.3 Raid / Host Info
+### 4.2 Raid / Host Info
 **Priority:** Low
 **Rationale:** Show recent raids/hosts if the API provides it (currently limited on Helix; can be skipped if unavailable).
+
+### 4.3 Share Profile
+**Priority:** Low
+**Rationale:** Add a share button to the profile screen that copies the Twitch profile URL or uses the platform share sheet. `share_plus` is already in `pubspec.yaml`.
+**Affected files:**
+- `lib/features/profile/presentation/channel_profile_screen.dart`
 
 ---
 
 ## 5. VOD & Clip Improvements
+
+> **Note:** Share stream/clip is already implemented in the watch screen via `SharePlus`.
 
 ### 5.1 VOD Chapters
 **Priority:** Medium
@@ -156,14 +151,7 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - `lib/features/vod/data/twitch_vod.dart`
 - `lib/features/watch/presentation/watch_screen.dart`
 
-### 5.2 Share Stream / Clip
-**Priority:** Medium
-**Rationale:** Add a share button to the watch screen and clip view that copies the Twitch URL or uses the platform share sheet.
-**Affected files:**
-- `lib/features/watch/presentation/watch_screen.dart`
-- Add dependency: `flutter: share_plus`
-
-### 5.3 Clip Download
+### 5.2 Clip Download
 **Priority:** Low
 **Rationale:** Let users download clips locally using the download manager.
 **Affected files:**
@@ -173,6 +161,8 @@ A curated set of features that can be implemented on top of the current Nice TV 
 ---
 
 ## 6. Notifications & Live Alerts
+
+> **Note:** Live alerts via EventSub, polling fallback, notifications inbox, mark all read, clear all, and push notifications are already implemented.
 
 ### 6.1 Per-Channel Notification Toggles
 **Priority:** Medium
@@ -278,21 +268,7 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - New: `lib/features/watch/presentation/multi_stream_screen.dart`
 - `lib/core/routing/app_router.dart`
 
-### 10.2 Chat Polls & Predictions Display
-**Priority:** Low
-**Rationale:** Parse and render Twitch channel poll/prediction messages from IRC tags. Requires additional IRC tag parsing.
-**Affected files:**
-- `lib/features/chat/data/irc_message.dart`
-- `lib/features/chat/presentation/chat_panel.dart`
-
-### 10.3 Auto-Translate Chat
-**Priority:** Low
-**Rationale:** Integrate with a translation API (e.g., LibreTranslate) to auto-translate non-English chat messages.
-**Affected files:**
-- `lib/features/chat/presentation/chat_panel.dart`
-- New: `lib/features/chat/data/translation_service.dart`
-
-### 10.4 Stream Delay Indicator
+### 10.2 Stream Delay Indicator
 **Priority:** Low
 **Rationale:** Estimate and display current stream delay (Twitch low-latency vs. normal).
 **Affected files:**
@@ -311,4 +287,4 @@ A curated set of features that can be implemented on top of the current Nice TV 
 
 ---
 
-*Last updated: 2026-08-11*
+*Last updated: 2026-08-14*

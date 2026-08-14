@@ -27,6 +27,7 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.broadcasterId,
     this.vodId,
     this.clipId,
+    this.thumbnailUrl,
   });
 
   final String channelLogin;
@@ -34,6 +35,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   final String? broadcasterId;
   final String? vodId;
   final String? clipId;
+  final String? thumbnailUrl;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -143,6 +145,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
         _resumePosition = pos;
         if (mounted) setState(() {});
       });
+      _saveVodMetadata();
     }
     _scheduleHistory();
     _schedulePositionSave();
@@ -154,6 +157,28 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
     _historyTimer?.cancel();
     _positionTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _saveVodMetadata() async {
+    if (widget.vodId == null) return;
+    final store = ref.read(vodProgressStoreProvider);
+    final existing = store.readEntry(widget.vodId!);
+    if (existing != null &&
+        existing.title.isNotEmpty &&
+        existing.thumbnailUrl.isNotEmpty) {
+      return;
+    }
+    await store.saveProgress(
+      VodProgressEntry(
+        vodId: widget.vodId!,
+        position: Duration.zero,
+        title: widget.title ?? '',
+        userName: widget.channelLogin,
+        userLogin: widget.channelLogin,
+        thumbnailUrl: widget.thumbnailUrl ?? '',
+        duration: Duration.zero,
+      ),
+    );
   }
 
   void _schedulePositionSave() {
@@ -180,7 +205,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
       if (position == null) return;
       final vodId = widget.vodId!;
       final store = ref.read(vodProgressStoreProvider);
-      final saved = store.readPosition(vodId);
+      final existing = store.readEntry(vodId);
       final duration = useNative
           ? _nativeKey.currentState?.player.state.duration
           : null;
@@ -188,8 +213,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
           duration != Duration.zero &&
           position > duration - const Duration(seconds: 10)) {
         await store.clear(vodId);
-      } else if (saved == null || position > saved) {
-        await store.savePosition(vodId, position);
+      } else if (existing == null || position > existing.position) {
+        await store.saveProgress(
+          VodProgressEntry(
+            vodId: vodId,
+            position: position,
+            title: existing?.title ?? widget.title ?? '',
+            userName: existing?.userName ?? widget.channelLogin,
+            userLogin: existing?.userLogin ?? widget.channelLogin,
+            thumbnailUrl: existing?.thumbnailUrl ?? widget.thumbnailUrl ?? '',
+            duration: duration ?? existing?.duration ?? Duration.zero,
+          ),
+        );
       }
     });
   }

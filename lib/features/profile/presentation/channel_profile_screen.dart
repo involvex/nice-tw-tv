@@ -298,6 +298,7 @@ class ChannelProfileScreen extends ConsumerWidget {
                               'title': vod.title,
                               'login': user.login,
                               'userId': user.id,
+                              'thumbnailUrl': vod.thumbnailUrl,
                             },
                           );
                           context.push(uri.toString());

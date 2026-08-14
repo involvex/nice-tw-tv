@@ -131,6 +131,7 @@ class VodScreen extends ConsumerWidget {
                             'title': vod.title,
                             'login': vod.userLogin,
                             'userId': vod.userId,
+                            'thumbnailUrl': vod.thumbnailUrl,
                           },
                         );
                         context.push(uri.toString());

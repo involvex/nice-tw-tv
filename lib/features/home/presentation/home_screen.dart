@@ -2,12 +2,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_clip.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
-import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
+import 'package:nice_tv/features/home/presentation/continue_watching_shelf.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 
 enum HomeFeedMode { cards, autoplay }
@@ -71,10 +70,6 @@ class HomeScreen extends ConsumerWidget {
     final mode = ref.watch(homeFeedModeProvider);
     final tab = ref.watch(homeBrowseTabProvider);
     final category = ref.watch(homeCategoryFilterProvider);
-    final auth = ref.watch(authControllerProvider).value;
-    final unread = ref.watch(
-      notificationsInboxProvider.select((s) => s.unreadCount),
-    );
     final theme = Theme.of(context);
 
     if (mode == HomeFeedMode.autoplay && tab == HomeBrowseTab.live) {
@@ -135,19 +130,9 @@ class HomeScreen extends ConsumerWidget {
               pinned: true,
               title: Text(
                 'Nice TV',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w800),
               ),
               actions: [
-                if (tab == HomeBrowseTab.live)
-                  IconButton(
-                    tooltip: 'Autoplay feed',
-                    onPressed: () =>
-                        ref.read(homeFeedModeProvider.notifier).toggle(),
-                    icon: const Icon(Icons.swipe_vertical),
-                  ),
                 IconButton(
                   tooltip: 'Search',
                   onPressed: () => context.push('/search'),
@@ -156,34 +141,17 @@ class HomeScreen extends ConsumerWidget {
                 IconButton(
                   tooltip: 'Notifications',
                   onPressed: () => context.push('/notifications'),
-                  icon: Badge(
-                    isLabelVisible: unread > 0,
-                    label: Text(unread > 99 ? '99+' : '$unread'),
-                    child: const Icon(Icons.notifications_outlined),
-                  ),
+                  icon: const Icon(Icons.notifications_outlined),
                 ),
                 IconButton(
                   tooltip: 'History',
                   onPressed: () => context.push('/history'),
                   icon: const Icon(Icons.history_outlined),
                 ),
-                if (auth?.isLoggedIn == true)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Center(
-                      child: Text(
-                        auth!.login ?? '',
-                        style: theme.textTheme.labelLarge,
-                      ),
-                    ),
-                  )
-                else
-                  TextButton(
-                    onPressed: () => context.push('/login'),
-                    child: const Text('Sign in'),
-                  ),
               ],
             ),
+            if (tab == HomeBrowseTab.live)
+              SliverToBoxAdapter(child: ContinueWatchingShelf()),
             const SliverToBoxAdapter(child: _HomeTabBar()),
             const SliverToBoxAdapter(child: _CategoryChips()),
             const SliverToBoxAdapter(child: _DiscoveryFilterBar()),
