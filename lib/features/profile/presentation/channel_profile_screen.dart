@@ -165,6 +165,26 @@ class ChannelProfileScreen extends ConsumerWidget {
                                                           ).notifier,
                                                         )
                                                         .toggle();
+                                                  } on SignInRequiredException {
+                                                    if (!context.mounted) {
+                                                      return;
+                                                    }
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      SnackBar(
+                                                        content: const Text(
+                                                          'Sign in to follow channels',
+                                                        ),
+                                                        action: SnackBarAction(
+                                                          label: 'Sign in',
+                                                          onPressed: () =>
+                                                              context.push(
+                                                                '/login',
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    );
                                                   } on Object catch (e) {
                                                     if (context.mounted) {
                                                       ScaffoldMessenger.of(

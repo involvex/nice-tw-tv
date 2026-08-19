@@ -1,6 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
+import 'package:nice_tv/features/profile/data/twitch_gql_client.dart';
+
+class SignInRequiredException implements Exception {
+  const SignInRequiredException();
+}
 
 class FollowState {
   const FollowState({required this.isFollowing, required this.isLoading});
@@ -22,11 +27,10 @@ class FollowController extends AsyncNotifier<FollowState> {
     }
     final helix = ref.read(helixRepositoryProvider);
     try {
-      final followed = await helix.getFollowedChannels(
+      final isFollowing = await helix.isFollowingChannel(
         userId: auth!.userId!,
-        first: 100,
+        broadcasterId: broadcasterId,
       );
-      final isFollowing = followed.any((c) => c.id == broadcasterId);
       return FollowState(isFollowing: isFollowing, isLoading: false);
     } on Object {
       return const FollowState(isFollowing: false, isLoading: false);
@@ -35,36 +39,40 @@ class FollowController extends AsyncNotifier<FollowState> {
 
   Future<void> toggle() async {
     final auth = ref.read(authControllerProvider).value;
-    if (auth?.isLoggedIn != true || auth?.userId == null) return;
+    if (auth == null ||
+        !auth.isLoggedIn ||
+        auth.userId == null ||
+        auth.accessToken == null) {
+      throw const SignInRequiredException();
+    }
     final current = state.value;
     if (current == null || current.isLoading) return;
 
     state = AsyncData(
       FollowState(isFollowing: current.isFollowing, isLoading: true),
     );
-    final helix = ref.read(helixRepositoryProvider);
     try {
+      final gql = ref.read(twitchGqlClientProvider);
       if (current.isFollowing) {
-        await helix.unfollowChannel(
-          userId: auth!.userId!,
-          broadcasterId: broadcasterId,
-        );
-        state = const AsyncData(
-          FollowState(isFollowing: false, isLoading: false),
+        await gql.unfollowUser(
+          accessToken: auth.accessToken!,
+          targetId: broadcasterId,
         );
       } else {
-        await helix.followChannel(
-          userId: auth!.userId!,
-          broadcasterId: broadcasterId,
-        );
-        state = const AsyncData(
-          FollowState(isFollowing: true, isLoading: false),
+        await gql.followUser(
+          accessToken: auth.accessToken!,
+          targetId: broadcasterId,
         );
       }
+      state = AsyncData(
+        FollowState(isFollowing: !current.isFollowing, isLoading: false),
+      );
+      ref.invalidate(followingFeedControllerProvider);
     } on Object {
       state = AsyncData(
         FollowState(isFollowing: current.isFollowing, isLoading: false),
       );
+      rethrow;
     }
   }
 }

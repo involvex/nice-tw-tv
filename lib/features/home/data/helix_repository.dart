@@ -249,24 +249,16 @@ class HelixRepository {
     return users.where((u) => u.id.isNotEmpty).toList();
   }
 
-  Future<void> followChannel({
+  Future<bool> isFollowingChannel({
     required String userId,
     required String broadcasterId,
   }) async {
-    await _dio.post(
+    final response = await _dio.get<Map<String, dynamic>>(
       '/helix/channels/followed',
-      data: {'user_id': userId, 'broadcaster_id': broadcasterId},
+      queryParameters: {'user_id': userId, 'broadcaster_id': broadcasterId},
     );
-  }
-
-  Future<void> unfollowChannel({
-    required String userId,
-    required String broadcasterId,
-  }) async {
-    await _dio.delete(
-      '/helix/channels/followed',
-      data: {'user_id': userId, 'broadcaster_id': broadcasterId},
-    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data.isNotEmpty;
   }
 
   Future<StreamsPage> getSimilarStreams({
