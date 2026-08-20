@@ -54,7 +54,7 @@ void main() {
       expect(restored.highContrast, isFalse);
       expect(restored.chatTimestamps, isFalse);
       expect(restored.maskLinks, isFalse);
-      expect(restored!.quietHoursEnabled, isFalse);
+      expect(restored.quietHoursEnabled, isFalse);
     });
 
     test('returns null for malformed input', () {
