@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nice_tv/features/chat/data/chat_search.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
 
 void main() {
@@ -126,6 +127,39 @@ void main() {
       ];
       final filtered = filterBlocked(messages, {'blocked'});
       expect(filtered.single.system, isTrue);
+    });
+  });
+
+  group('searchMessages', () {
+    ChatMessage msg(String id, String text, {String? displayName}) {
+      return ChatMessage(
+        id: id,
+        channel: 'c',
+        login: 'user$id',
+        displayName: displayName ?? 'User$id',
+        message: text,
+        color: null,
+        isAction: false,
+        timestamp: DateTime.now(),
+      );
+    }
+
+    test('matches message text case-insensitively', () {
+      final messages = [msg('1', 'Hello world'), msg('2', 'Another line')];
+      final hits = searchMessages(messages, 'hello');
+      expect(hits.single.id, '1');
+    });
+
+    test('matches display name', () {
+      final messages = [msg('1', 'hi', displayName: 'Host'), msg('2', 'hi')];
+      final hits = searchMessages(messages, 'host');
+      expect(hits.single.id, '1');
+    });
+
+    test('returns all for empty query', () {
+      final messages = [msg('1', 'a'), msg('2', 'b')];
+      expect(searchMessages(messages, '').length, 2);
+      expect(searchMessages(messages, '   ').length, 2);
     });
   });
 }
