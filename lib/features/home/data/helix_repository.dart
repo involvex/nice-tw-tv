@@ -7,6 +7,7 @@ import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/home/data/twitch_clip.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/profile/data/channel_panels.dart';
 import 'package:nice_tv/features/profile/data/channel_schedule.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
@@ -401,6 +402,18 @@ class HelixRepository {
       },
     );
     return _parseClipsPage(response.data!);
+  }
+
+  Future<ChannelPanels> getChannelPanels(String broadcasterId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/helix/channels/panels',
+        queryParameters: {'broadcaster_id': broadcasterId},
+      );
+      return ChannelPanels.fromJson(response.data!);
+    } on Object {
+      return const ChannelPanels(panels: []);
+    }
   }
 
   Future<ChannelSchedule> getChannelSchedule(
