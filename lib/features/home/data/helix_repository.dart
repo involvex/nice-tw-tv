@@ -7,6 +7,7 @@ import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/home/data/twitch_clip.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/profile/data/channel_schedule.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
 
@@ -400,6 +401,17 @@ class HelixRepository {
       },
     );
     return _parseClipsPage(response.data!);
+  }
+
+  Future<ChannelSchedule> getChannelSchedule(
+    String broadcasterId, {
+    int first = 12,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/helix/schedule',
+      queryParameters: {'broadcaster_id': broadcasterId, 'first': first},
+    );
+    return ChannelSchedule.fromJson(response.data!);
   }
 
   /// Popular clips across top categories when no game filter is selected.
