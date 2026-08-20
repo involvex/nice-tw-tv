@@ -11,6 +11,7 @@ import 'package:nice_tv/features/profile/data/channel_panels.dart';
 import 'package:nice_tv/features/profile/data/channel_schedule.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
+import 'package:nice_tv/features/vod/data/vod_chapters.dart';
 
 final helixDioProvider = Provider<Dio>((ref) {
   final base = ref.watch(dioProvider);
@@ -384,6 +385,18 @@ class HelixRepository {
     }
     vods.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return VodsPage(vods: vods);
+  }
+
+  Future<VodChapters> getVodChapters(String vodId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/helix/videos/chapters',
+        queryParameters: {'video_id': vodId},
+      );
+      return VodChapters.fromJson(response.data!);
+    } on Object {
+      return const VodChapters(chapters: []);
+    }
   }
 
   Future<ClipsPage> getClips({
