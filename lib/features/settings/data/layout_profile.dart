@@ -16,6 +16,8 @@ class StreamerLayoutProfile {
     this.playerBackend,
     this.preferredQuality,
     this.theaterMode = false,
+    this.accentArgb,
+    this.qualityOverride,
   });
 
   final ChatPlacement chatPlacement;
@@ -34,6 +36,12 @@ class StreamerLayoutProfile {
   /// When true, the player takes the full screen and chat is hidden.
   final bool theaterMode;
 
+  /// Optional per-channel accent color (ARGB value).
+  final int? accentArgb;
+
+  /// Optional per-channel quality override (e.g. '1080p', 'auto').
+  final String? qualityOverride;
+
   StreamerLayoutProfile copyWith({
     ChatPlacement? chatPlacement,
     int? chatDensity,
@@ -44,6 +52,8 @@ class StreamerLayoutProfile {
     String? preferredQuality,
     bool clearPreferredQuality = false,
     bool? theaterMode,
+    int? accentArgb,
+    String? qualityOverride,
   }) {
     return StreamerLayoutProfile(
       chatPlacement: chatPlacement ?? this.chatPlacement,
@@ -56,6 +66,8 @@ class StreamerLayoutProfile {
           ? null
           : (preferredQuality ?? this.preferredQuality),
       theaterMode: theaterMode ?? this.theaterMode,
+      accentArgb: accentArgb ?? this.accentArgb,
+      qualityOverride: qualityOverride ?? this.qualityOverride,
     );
   }
 
@@ -66,6 +78,8 @@ class StreamerLayoutProfile {
     'playerBackend': playerBackend?.name,
     'preferredQuality': preferredQuality,
     'theaterMode': theaterMode,
+    'accentArgb': accentArgb,
+    'qualityOverride': qualityOverride,
   };
 
   factory StreamerLayoutProfile.fromJson(Map<String, dynamic> json) {
@@ -89,6 +103,8 @@ class StreamerLayoutProfile {
       playerBackend: backend,
       preferredQuality: json['preferredQuality'] as String?,
       theaterMode: json['theaterMode'] as bool? ?? false,
+      accentArgb: json['accentArgb'] as int?,
+      qualityOverride: json['qualityOverride'] as String?,
     );
   }
 }
@@ -98,6 +114,8 @@ class LayoutProfileStore {
 
   static const _key = 'streamer_layout_profiles';
   static const playerBackendKey = 'player_backend';
+  static const accentArgbKey = 'accent_argb';
+  static const qualityOverrideKey = 'quality_override';
 
   final SharedPreferences _prefs;
 
