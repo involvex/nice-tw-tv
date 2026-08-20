@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/core/storage/app_storage.dart';
 import 'package:nice_tv/core/theme/nice_tv_theme.dart';
+import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppSettings {
@@ -72,6 +73,9 @@ class AppSettings {
       ThemeMode.system => 'system',
     };
   }
+
+  static bool canModerateChat(AuthSession? session) =>
+      session?.isLoggedIn == true;
 }
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {

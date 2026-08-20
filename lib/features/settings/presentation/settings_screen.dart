@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
+import 'package:nice_tv/features/settings/presentation/blocked_users_section.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -112,6 +113,10 @@ class SettingsScreen extends ConsumerWidget {
                   .setChatDensity(set.first);
             },
           ),
+          if (AppSettings.canModerateChat(auth)) ...[
+            const SizedBox(height: 16),
+            const BlockedUsersSection(),
+          ],
           const SizedBox(height: 24),
           Text('Stream', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
