@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/chat/data/chat_client.dart';
+import 'package:nice_tv/features/chat/data/chat_search.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
 import 'package:nice_tv/features/emotes/data/emote.dart';
 import 'package:nice_tv/features/emotes/data/seventv_events.dart';
@@ -34,6 +35,9 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   final _focus = FocusNode();
   var _suggestions = <Emote>[];
   ChatMessage? _replyingTo;
+  final _searchController = TextEditingController();
+  var _searchQuery = '';
+  var _searching = false;
 
   @override
   void initState() {
@@ -51,6 +55,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
       ..dispose();
     _scroll.dispose();
     _focus.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -180,6 +185,10 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
         ? 'Reply to ${_replyingTo!.displayName}'
         : 'Send a message';
 
+    final visibleMessages = _searching
+        ? searchMessages(chat.messages, _searchQuery)
+        : chat.messages;
+
     return Column(
       children: [
         if (chat.status != ChatLinkStatus.connected)
@@ -215,13 +224,76 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
               ),
             ),
           ),
+        if (_searching)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search messages',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _searching = false;
+                    });
+                  },
+                ),
+                isDense: true,
+              ),
+            ),
+          ),
+        if (chat.roomState.anyRestriction)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (chat.roomState.slow) _RoomBadge(label: 'Slow mode'),
+                if (chat.roomState.followersOnly)
+                  _RoomBadge(label: 'Followers-only'),
+                if (chat.roomState.subscribersOnly)
+                  _RoomBadge(label: 'Subs-only'),
+                if (chat.roomState.emotesOnly) _RoomBadge(label: 'Emote-only'),
+              ],
+            ),
+          ),
+        if (chat.historical)
+          Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.history,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Showing saved messages from your last visit',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             controller: _scroll,
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: pad),
-            itemCount: chat.messages.length,
+            itemCount: visibleMessages.length,
             itemBuilder: (context, index) {
-              final msg = chat.messages[index];
+              final msg = visibleMessages[index];
               return Padding(
                 padding: EdgeInsets.symmetric(vertical: pad / 2),
                 child: ChatMessageTile(
@@ -284,6 +356,19 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
             child: Row(
               children: [
+                IconButton(
+                  tooltip: 'Search chat',
+                  onPressed: () => setState(() {
+                    _searching = !_searching;
+                    if (!_searching) {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    }
+                  }),
+                  icon: Icon(
+                    _searching ? Icons.close_fullscreen : Icons.search,
+                  ),
+                ),
                 IconButton(
                   tooltip: 'Emotes',
                   onPressed: canSend ? () => _openEmotePicker(catalog) : null,
@@ -597,5 +682,29 @@ class ChatMessageTile extends StatelessWidget {
     final cleaned = hex.replaceFirst('#', '');
     if (cleaned.length != 6) return null;
     return Color(int.parse('FF$cleaned', radix: 16));
+  }
+}
+
+class _RoomBadge extends StatelessWidget {
+  const _RoomBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSecondaryContainer,
+        ),
+      ),
+    );
   }
 }
