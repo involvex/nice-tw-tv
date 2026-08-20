@@ -67,8 +67,12 @@ class _NiceTvAppState extends ConsumerState<NiceTvApp> {
       title: 'Nice TV',
       debugShowCheckedModeBanner: false,
       themeMode: settings.themeMode,
-      theme: NiceTvTheme.light(settings.accent),
-      darkTheme: NiceTvTheme.dark(settings.accent),
+      theme: settings.highContrast
+          ? NiceTvTheme.highContrastLight(settings.accent)
+          : NiceTvTheme.light(settings.accent),
+      darkTheme: settings.highContrast
+          ? NiceTvTheme.highContrastDark(settings.accent)
+          : NiceTvTheme.dark(settings.accent),
       routerConfig: router,
     );
   }

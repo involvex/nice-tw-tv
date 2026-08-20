@@ -97,6 +97,18 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('High contrast'),
+            subtitle: const Text('Stronger color contrast for accessibility'),
+            value: settings.highContrast,
+            onChanged: (value) {
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setHighContrast(value);
+            },
+          ),
+          const SizedBox(height: 24),
           Text('Chat', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           Text('Density', style: theme.textTheme.titleSmall),

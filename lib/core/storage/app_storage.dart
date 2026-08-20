@@ -49,6 +49,7 @@ class SettingsStorage {
   static const videoVolumeKey = 'video_volume';
   static const videoMutedKey = 'video_muted';
   static const playbackSpeedKey = 'playback_speed';
+  static const highContrastKey = 'high_contrast';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -106,4 +107,9 @@ class SettingsStorage {
 
   Future<void> setPlaybackSpeed(double value) =>
       _prefs.setDouble(playbackSpeedKey, value);
+
+  bool get highContrast => _prefs.getBool(highContrastKey) ?? false;
+
+  Future<void> setHighContrast(bool value) =>
+      _prefs.setBool(highContrastKey, value);
 }

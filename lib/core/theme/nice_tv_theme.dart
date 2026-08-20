@@ -25,6 +25,25 @@ class NiceTvTheme {
     return _base(scheme);
   }
 
+  static ThemeData highContrastLight(Color seed) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.light,
+      contrastLevel: 1.0,
+    );
+    return _base(scheme);
+  }
+
+  static ThemeData highContrastDark(Color seed) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.dark,
+      surface: const Color(0xFF0E1116),
+      contrastLevel: 1.0,
+    );
+    return _base(scheme);
+  }
+
   static ThemeData _base(ColorScheme scheme) {
     final textTheme = GoogleFonts.dmSansTextTheme().apply(
       bodyColor: scheme.onSurface,

@@ -17,6 +17,7 @@ class AppSettings {
     this.videoVolume = 0.7,
     this.videoMuted = false,
     this.playbackSpeed = 1.0,
+    this.highContrast = false,
   });
 
   final ThemeMode themeMode;
@@ -29,6 +30,7 @@ class AppSettings {
   final double videoVolume;
   final bool videoMuted;
   final double playbackSpeed;
+  final bool highContrast;
 
   Color get accent => Color(accentArgb);
 
@@ -43,6 +45,7 @@ class AppSettings {
     double? videoVolume,
     bool? videoMuted,
     double? playbackSpeed,
+    bool? highContrast,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -55,6 +58,7 @@ class AppSettings {
       videoVolume: videoVolume ?? this.videoVolume,
       videoMuted: videoMuted ?? this.videoMuted,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      highContrast: highContrast ?? this.highContrast,
     );
   }
 
@@ -101,6 +105,7 @@ class SettingsController extends Notifier<AppSettings> {
       videoVolume: storage.videoVolume,
       videoMuted: storage.videoMuted,
       playbackSpeed: storage.playbackSpeed,
+      highContrast: storage.highContrast,
     );
   }
 
@@ -155,6 +160,11 @@ class SettingsController extends Notifier<AppSettings> {
   Future<void> setPlaybackSpeed(double speed) async {
     await ref.read(settingsStorageProvider).setPlaybackSpeed(speed);
     state = state.copyWith(playbackSpeed: speed);
+  }
+
+  Future<void> setHighContrast(bool value) async {
+    await ref.read(settingsStorageProvider).setHighContrast(value);
+    state = state.copyWith(highContrast: value);
   }
 }
 
