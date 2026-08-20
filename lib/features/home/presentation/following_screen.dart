@@ -6,6 +6,7 @@ import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
+import 'package:nice_tv/features/home/presentation/offline_channels_section.dart';
 
 class FollowingScreen extends ConsumerWidget {
   const FollowingScreen({super.key});
@@ -57,71 +58,78 @@ class FollowingScreen extends ConsumerWidget {
                     .refresh();
                 ref.invalidate(followedCategoriesProvider);
               },
-              child: feed.isLoading && feed.streams.isEmpty
-                  ? ListView(
-                      children: const [
-                        SizedBox(height: 120),
-                        Center(child: CircularProgressIndicator()),
-                      ],
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  if (feed.isLoading && feed.streams.isEmpty)
+                    const SizedBox(
+                      height: 200,
+                      child: Center(child: CircularProgressIndicator()),
                     )
-                  : feed.error != null && feed.streams.isEmpty
-                  ? ListView(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            children: [
-                              Text(feed.error!, textAlign: TextAlign.center),
-                              const SizedBox(height: 12),
-                              FilledButton(
-                                onPressed: () => ref
-                                    .read(
-                                      followingFeedControllerProvider.notifier,
-                                    )
-                                    .refresh(),
-                                child: const Text('Retry'),
-                              ),
-                            ],
+                  else if (feed.error != null && feed.streams.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Text(feed.error!, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () => ref
+                                .read(followingFeedControllerProvider.notifier)
+                                .refresh(),
+                            child: const Text('Retry'),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     )
-                  : feed.streams.isEmpty
-                  ? ListView(
-                      children: [
-                        SizedBox(
-                          height: 200,
-                          child: Center(
-                            child: Text(
-                              'No followed live channels right now.',
-                              style: theme.textTheme.bodyLarge,
-                            ),
-                          ),
+                  else if (feed.streams.isEmpty)
+                    SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: Text(
+                          'No followed live channels right now.',
+                          style: theme.textTheme.bodyLarge,
                         ),
-                      ],
+                      ),
                     )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      itemCount:
-                          feed.streams.length + (feed.cursor != null ? 1 : 0),
-                      separatorBuilder: (_, _) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        if (index >= feed.streams.length) {
-                          ref
-                              .read(followingFeedControllerProvider.notifier)
-                              .loadMore();
-                          return const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        return StreamCard(stream: feed.streams[index]);
-                      },
-                    ),
+                  else
+                    for (final stream in feed.streams)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: StreamCard(stream: stream),
+                      ),
+                  if (feed.cursor != null) const _LoadMoreProbe(),
+                  OfflineChannelsSection(),
+                ],
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LoadMoreProbe extends ConsumerStatefulWidget {
+  const _LoadMoreProbe();
+
+  @override
+  ConsumerState<_LoadMoreProbe> createState() => _LoadMoreProbeState();
+}
+
+class _LoadMoreProbeState extends ConsumerState<_LoadMoreProbe> {
+  @override
+  void initState() {
+    super.initState();
+    // ignore: discarded_futures
+    ref.read(followingFeedControllerProvider.notifier).loadMore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.all(16),
+      child: Center(child: CircularProgressIndicator()),
     );
   }
 }
