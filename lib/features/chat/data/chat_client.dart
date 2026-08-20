@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/chat/data/blocked_users_store.dart';
+import 'package:nice_tv/features/chat/data/chat_history_store.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
+import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 enum ChatLinkStatus { disconnected, connecting, connected, reconnecting }
@@ -13,12 +16,16 @@ class ChatConnectionState {
     this.status = ChatLinkStatus.disconnected,
     this.error,
     this.canSend = false,
+    this.roomState = const RoomState(),
+    this.historical = false,
   });
 
   final List<ChatMessage> messages;
   final ChatLinkStatus status;
   final String? error;
   final bool canSend;
+  final RoomState roomState;
+  final bool historical;
 
   bool get connected => status == ChatLinkStatus.connected;
   bool get connecting =>
@@ -31,12 +38,16 @@ class ChatConnectionState {
     String? error,
     bool clearError = false,
     bool? canSend,
+    RoomState? roomState,
+    bool? historical,
   }) {
     return ChatConnectionState(
       messages: messages ?? this.messages,
       status: status ?? this.status,
       error: clearError ? null : (error ?? this.error),
       canSend: canSend ?? this.canSend,
+      roomState: roomState ?? this.roomState,
+      historical: historical ?? this.historical,
     );
   }
 }
@@ -78,6 +89,9 @@ class TwitchIrcClient {
   String? _login;
 
   Stream<IrcClientEvent> get events => _controller.stream;
+
+  /// Latest room state; emitted before messages after JOIN.
+  RoomState? lastRoomState;
 
   Future<void> connect({String? oauthToken, String? login}) async {
     _oauthToken = oauthToken;
@@ -142,6 +156,11 @@ class TwitchIrcClient {
       if (line.isEmpty) continue;
       if (line.startsWith('PING')) {
         _send(line.replaceFirst('PING', 'PONG'));
+        continue;
+      }
+      final parsed = IrcMessageParser.parseLine(line);
+      if (parsed.command == 'ROOMSTATE') {
+        lastRoomState = RoomState.fromIrcTags(parsed.tags);
         continue;
       }
       final message = _parser.toChatMessage(line);
@@ -211,11 +230,15 @@ class ChatController extends Notifier<ChatConnectionState> {
     _reconnectTimer?.cancel();
     _attempt = 0;
     _channel = channelLogin;
+    final history = ChatHistoryStore(ref.read(sharedPreferencesProvider))
+        .read(channelLogin);
     state = _withSend(
       state.copyWith(
         status: ChatLinkStatus.connecting,
         clearError: true,
-        messages: [],
+        messages: history,
+        historical: history.isNotEmpty,
+        roomState: const RoomState(),
       ),
     );
     await _sub?.cancel();
@@ -230,6 +253,9 @@ class ChatController extends Notifier<ChatConnectionState> {
         oauthToken: auth?.isLoggedIn == true ? auth!.accessToken : null,
         login: auth?.login,
       );
+      if (_client!.lastRoomState != null) {
+        state = state.copyWith(roomState: _client!.lastRoomState!);
+      }
       _appendSystem('Joined #${channelLogin.toLowerCase()}');
       state = _withSend(
         state.copyWith(status: ChatLinkStatus.connected, clearError: true),
@@ -250,17 +276,22 @@ class ChatController extends Notifier<ChatConnectionState> {
     switch (event.kind) {
       case IrcEventKind.message:
         final msg = event.message!;
-        final next = [...state.messages, msg];
-        final trimmed = next.length > 400
-            ? next.sublist(next.length - 400)
-            : next;
+        final blocked = ref.read(blockedUsersControllerProvider);
+        final visible = filterBlocked([...state.messages, msg], blocked);
+        final next = visible.length > 400
+            ? visible.sublist(visible.length - 400)
+            : visible;
         state = _withSend(
           state.copyWith(
-            messages: trimmed,
+            messages: next,
             status: ChatLinkStatus.connected,
             clearError: true,
           ),
         );
+        if (_channel != null && !msg.system) {
+          ChatHistoryStore(ref.read(sharedPreferencesProvider))
+              .write(_channel!, next.where((m) => !m.system).toList());
+        }
         _attempt = 0;
       case IrcEventKind.error:
         _appendSystem('Chat error: ${event.error}');
@@ -304,6 +335,9 @@ class ChatController extends Notifier<ChatConnectionState> {
         oauthToken: auth?.isLoggedIn == true ? auth!.accessToken : null,
         login: auth?.login,
       );
+      if (_client!.lastRoomState != null) {
+        state = state.copyWith(roomState: _client!.lastRoomState!);
+      }
       _appendSystem('Rejoined #${_channel!.toLowerCase()}');
       state = _withSend(
         state.copyWith(status: ChatLinkStatus.connected, clearError: true),
@@ -358,6 +392,30 @@ class ChatController extends Notifier<ChatConnectionState> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Sends a raw command line like `/timeout user 600` to the channel.
+  void sendModeration(String command) {
+    if (!_loggedIn) {
+      _appendSystem('Sign in to moderate chat.');
+      return;
+    }
+    if (state.status != ChatLinkStatus.connected) {
+      _appendSystem('Chat is disconnected.');
+      return;
+    }
+    _client?.sendMessage(command);
+  }
+
+  void replayHistory() {
+    if (_channel == null) return;
+    final history = ChatHistoryStore(ref.read(sharedPreferencesProvider))
+        .read(_channel!);
+    final blocked = ref.read(blockedUsersControllerProvider);
+    state = state.copyWith(
+      messages: filterBlocked(history, blocked),
+      historical: true,
     );
   }
 }
