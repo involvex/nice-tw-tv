@@ -152,7 +152,7 @@ Run: `git commit -m "feat: add channel panels and about section"`
 **Interfaces:**
 - Produces: `List<HistoryItem> filterHistory(List<HistoryItem> items, String query)`.
 
-- [ ] **Step 1: Write failing test, implement search filter, add search bar to history screen, test & commit.**
+- [x] **Step 1: Write failing test, implement search filter, add search bar to history screen, test & commit.** — DONE (filterHistory in data layer; NotifierProvider query + derived filteredHistoryProvider; search bar wired into HistoryScreen; 60 tests pass)
 
 ---
 
@@ -160,11 +160,12 @@ Run: `git commit -m "feat: add channel panels and about section"`
 
 **Files:**
 - Modify: `lib/features/watch/presentation/watch_screen.dart`
+- Modify: `lib/features/settings/data/layout_profile.dart`
 
 **Interfaces:**
 - Produces: Theater mode layout variant in `WatchScreen`.
 
-- [ ] **Step 1: Add theater mode toggle button in watch screen player header, update layout, analyze & commit.**
+- [x] **Step 1: Add theater mode toggle button in watch screen player header, update layout, analyze & commit.** — DONE (`theaterMode` field added to `StreamerLayoutProfile` (persisted per-channel via copyWith/toJson/fromJson); toggle button in `AppBar` actions (`Icons.theaters`); theater layout hides chat and fills player via `Column(Expanded(child: player))`; 61 tests pass, analyze clean)
 
 ---
 

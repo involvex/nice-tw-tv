@@ -497,6 +497,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
         !_forceEmbedFallback;
     final quality = profile.preferredQuality ?? _quality;
     final showChat = !isClip && profile.chatPlacement != ChatPlacement.hidden;
+    final theaterMode = profile.theaterMode;
     final forceSide =
         profile.chatPlacement == ChatPlacement.side ||
         (profile.chatPlacement == ChatPlacement.bottom && isLandscape);
@@ -717,6 +718,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
               icon: const Icon(Icons.dashboard_customize_outlined),
             ),
             IconButton(
+              tooltip: theaterMode ? 'Exit theater mode' : 'Theater mode',
+              onPressed: () {
+                _saveProfile(profile.copyWith(theaterMode: !theaterMode));
+              },
+              icon: Icon(
+                theaterMode ? Icons.theaters : Icons.theaters_outlined,
+              ),
+            ),
+            IconButton(
               tooltip: showChat ? 'Hide chat' : 'Show chat',
               onPressed: () async {
                 final next = showChat
@@ -731,7 +741,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
             ),
           ],
         ),
-        body: forceSide && showChat
+        body: theaterMode
+            ? Column(children: [Expanded(child: player)])
+            : forceSide && showChat
             ? Row(
                 children: [
                   Expanded(flex: videoFlex, child: player),

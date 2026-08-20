@@ -15,6 +15,7 @@ class StreamerLayoutProfile {
     this.videoChatRatio = 0.6,
     this.playerBackend,
     this.preferredQuality,
+    this.theaterMode = false,
   });
 
   final ChatPlacement chatPlacement;
@@ -30,6 +31,9 @@ class StreamerLayoutProfile {
 
   final String? preferredQuality;
 
+  /// When true, the player takes the full screen and chat is hidden.
+  final bool theaterMode;
+
   StreamerLayoutProfile copyWith({
     ChatPlacement? chatPlacement,
     int? chatDensity,
@@ -39,6 +43,7 @@ class StreamerLayoutProfile {
     bool clearPlayerBackend = false,
     String? preferredQuality,
     bool clearPreferredQuality = false,
+    bool? theaterMode,
   }) {
     return StreamerLayoutProfile(
       chatPlacement: chatPlacement ?? this.chatPlacement,
@@ -50,6 +55,7 @@ class StreamerLayoutProfile {
       preferredQuality: clearPreferredQuality
           ? null
           : (preferredQuality ?? this.preferredQuality),
+      theaterMode: theaterMode ?? this.theaterMode,
     );
   }
 
@@ -59,6 +65,7 @@ class StreamerLayoutProfile {
     'videoChatRatio': videoChatRatio,
     'playerBackend': playerBackend?.name,
     'preferredQuality': preferredQuality,
+    'theaterMode': theaterMode,
   };
 
   factory StreamerLayoutProfile.fromJson(Map<String, dynamic> json) {
@@ -81,6 +88,7 @@ class StreamerLayoutProfile {
       videoChatRatio: (json['videoChatRatio'] as num?)?.toDouble() ?? 0.6,
       playerBackend: backend,
       preferredQuality: json['preferredQuality'] as String?,
+      theaterMode: json['theaterMode'] as bool? ?? false,
     );
   }
 }

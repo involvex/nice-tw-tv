@@ -9,6 +9,7 @@ void main() {
       videoChatRatio: 0.7,
       playerBackend: PlayerBackend.nativeHls,
       preferredQuality: '720p60',
+      theaterMode: true,
     );
     final restored = StreamerLayoutProfile.fromJson(profile.toJson());
     expect(restored.chatPlacement, ChatPlacement.side);
@@ -16,5 +17,13 @@ void main() {
     expect(restored.videoChatRatio, 0.7);
     expect(restored.playerBackend, PlayerBackend.nativeHls);
     expect(restored.preferredQuality, '720p60');
+    expect(restored.theaterMode, isTrue);
+  });
+
+  test('StreamerLayoutProfile theaterMode defaults to false', () {
+    const profile = StreamerLayoutProfile();
+    expect(profile.theaterMode, isFalse);
+    final restored = StreamerLayoutProfile.fromJson(profile.toJson());
+    expect(restored.theaterMode, isFalse);
   });
 }
