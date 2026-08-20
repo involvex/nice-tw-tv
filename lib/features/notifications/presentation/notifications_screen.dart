@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/notifications/data/muted_channels_store.dart';
 import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 
 class NotificationsScreen extends ConsumerWidget {
@@ -12,6 +13,7 @@ class NotificationsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final auth = ref.watch(authControllerProvider).value;
     final inbox = ref.watch(notificationsInboxProvider);
+    final muted = ref.watch(mutedChannelsControllerProvider);
 
     if (auth?.isLoggedIn != true) {
       return Scaffold(
@@ -169,9 +171,34 @@ class NotificationsScreen extends ConsumerWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: Text(
-                      _relative(item.wentLiveAt),
-                      style: theme.textTheme.labelSmall,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _relative(item.wentLiveAt),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                        IconButton(
+                          tooltip: muted.contains(item.userLogin.toLowerCase())
+                              ? 'Unmute notifications'
+                              : 'Mute notifications',
+                          onPressed: () {
+                            final notifier = ref.read(
+                              mutedChannelsControllerProvider.notifier,
+                            );
+                            if (muted.contains(item.userLogin.toLowerCase())) {
+                              notifier.unmute(item.userLogin);
+                            } else {
+                              notifier.mute(item.userLogin);
+                            }
+                          },
+                          icon: Icon(
+                            muted.contains(item.userLogin.toLowerCase())
+                                ? Icons.notifications_off_outlined
+                                : Icons.notifications_outlined,
+                          ),
+                        ),
+                      ],
                     ),
                     onTap: () async {
                       await ref

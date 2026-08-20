@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
+import 'package:nice_tv/features/notifications/data/muted_channels_store.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/settings/presentation/blocked_users_section.dart';
@@ -302,6 +303,32 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Consumer(
+            builder: (context, ref, _) {
+              final muted = ref.watch(mutedChannelsControllerProvider);
+              if (muted.isEmpty) {
+                return Text(
+                  'No muted channels. Mute a channel from its live-alert row.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                );
+              }
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: muted.map((login) {
+                  return InputChip(
+                    label: Text(login),
+                    onDeleted: () => ref
+                        .read(mutedChannelsControllerProvider.notifier)
+                        .unmute(login),
+                  );
+                }).toList(),
+              );
+            },
           ),
           const SizedBox(height: 8),
           Text('Player backend', style: theme.textTheme.titleSmall),
