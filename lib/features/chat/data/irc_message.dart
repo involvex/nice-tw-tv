@@ -62,6 +62,81 @@ class ChatMessage {
 
   bool get isCheer => bits != null && bits! > 0;
 
+  ChatMessage copyWith({String? message}) {
+    return ChatMessage(
+      id: id,
+      channel: channel,
+      login: login,
+      displayName: displayName,
+      message: message ?? this.message,
+      color: color,
+      isAction: isAction,
+      timestamp: timestamp,
+      system: system,
+      badges: badges,
+      bits: bits,
+      replyParent: replyParent,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'channel': channel,
+    'login': login,
+    'displayName': displayName,
+    'message': message,
+    'color': color,
+    'isAction': isAction,
+    'timestamp': timestamp.toIso8601String(),
+    'system': system,
+    'badges': badges
+        .map((b) => {'set': b.setId, 'version': b.version})
+        .toList(),
+    'bits': bits,
+    'replyParent': replyParent == null
+        ? null
+        : {
+            'messageId': replyParent!.messageId,
+            'userLogin': replyParent!.userLogin,
+            'displayName': replyParent!.displayName,
+            'body': replyParent!.body,
+          },
+  };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final rawBadges = json['badges'] as List<dynamic>? ?? const [];
+    final reply = json['replyParent'] as Map<String, dynamic>?;
+    return ChatMessage(
+      id: json['id'] as String? ?? '',
+      channel: json['channel'] as String? ?? '',
+      login: json['login'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      message: json['message'] as String? ?? '',
+      color: json['color'] as String?,
+      isAction: json['isAction'] as bool? ?? false,
+      timestamp:
+          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+          DateTime.now(),
+      system: json['system'] as bool? ?? false,
+      badges: rawBadges.map((e) {
+        final map = e as Map<String, dynamic>;
+        return ChatBadgeRef(
+          setId: map['set'] as String? ?? '',
+          version: map['version'] as String? ?? '',
+        );
+      }).toList(),
+      bits: json['bits'] as int?,
+      replyParent: reply == null
+          ? null
+          : ChatReplyParent(
+              messageId: reply['messageId'] as String? ?? '',
+              userLogin: reply['userLogin'] as String? ?? '',
+              displayName: reply['displayName'] as String? ?? '',
+              body: reply['body'] as String? ?? '',
+            ),
+    );
+  }
+
   factory ChatMessage.system(String text) {
     return ChatMessage(
       id: 'sys-${DateTime.now().microsecondsSinceEpoch}',
@@ -231,4 +306,54 @@ class TextSegment extends ChatSegment {
 class EmoteSegment extends ChatSegment {
   const EmoteSegment(this.emote);
   final Emote emote;
+}
+
+/// Parsed subset of Twitch IRC `ROOMSTATE` tags.
+class RoomState {
+  const RoomState({
+    this.slow = false,
+    this.followersOnly = false,
+    this.followerOnlyMinutes = 0,
+    this.subscribersOnly = false,
+    this.emotesOnly = false,
+  });
+
+  final bool slow;
+  final bool followersOnly;
+  final int followerOnlyMinutes;
+  final bool subscribersOnly;
+  final bool emotesOnly;
+
+  bool get anyRestriction =>
+      slow || followersOnly || subscribersOnly || emotesOnly;
+
+  factory RoomState.fromIrcTags(Map<String, String> tags) {
+    bool enabled(String key) {
+      final raw = tags[key];
+      if (raw == null || raw.isEmpty) return false;
+      final value = int.tryParse(raw) ?? 0;
+      return value > 0;
+    }
+
+    final followRaw = tags['followers-only'];
+    return RoomState(
+      slow: enabled('slow'),
+      followersOnly: enabled('followers-only'),
+      followerOnlyMinutes: (int.tryParse(followRaw ?? '') ?? 0).clamp(
+        0,
+        1 << 31,
+      ),
+      subscribersOnly: enabled('subs-only'),
+      emotesOnly: enabled('emote-only'),
+    );
+  }
+}
+
+/// Removes non-system messages whose [ChatMessage.login] is in [blocked].
+List<ChatMessage> filterBlocked(
+  List<ChatMessage> messages,
+  Set<String> blocked,
+) {
+  if (blocked.isEmpty) return messages;
+  return messages.where((m) => m.system || !blocked.contains(m.login)).toList();
 }
