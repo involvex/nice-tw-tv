@@ -159,6 +159,9 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     final maskLinks = ref.watch(
       settingsControllerProvider.select((s) => s.maskLinks),
     );
+    final chatFontFamily = ref.watch(
+      settingsControllerProvider.select((s) => s.chatFontFamily),
+    );
     final pad = switch (density) {
       0 => 4.0,
       2 => 10.0,
@@ -310,6 +313,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                   fontSize: fontSize,
                   showTimestamp: chatTimestamps,
                   maskLinks: maskLinks,
+                  chatFontFamily: chatFontFamily,
                   onReply: canSend ? () => _startReply(msg) : null,
                   onUserTap: () => showUserCard(
                     context,
@@ -573,6 +577,7 @@ class ChatMessageTile extends StatelessWidget {
     required this.fontSize,
     this.showTimestamp = false,
     this.maskLinks = false,
+    this.chatFontFamily = 'Segoe UI',
     this.onReply,
     this.onUserTap,
   });
@@ -581,6 +586,7 @@ class ChatMessageTile extends StatelessWidget {
   final EmoteCatalog catalog;
   final BadgeCatalog badges;
   final double fontSize;
+  final String chatFontFamily;
   final bool showTimestamp;
   final bool maskLinks;
   final VoidCallback? onReply;
@@ -595,6 +601,7 @@ class ChatMessageTile extends StatelessWidget {
         style: theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
           fontStyle: FontStyle.italic,
+          fontFamily: chatFontFamily,
           fontSize: fontSize - 1,
         ),
       );
@@ -628,6 +635,7 @@ class ChatMessageTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
+                        fontFamily: chatFontFamily,
                       ),
                     ),
                   ),
@@ -670,6 +678,7 @@ class ChatMessageTile extends StatelessWidget {
                         color: message.isCheer ? cheerColor : color,
                         fontWeight: FontWeight.w700,
                         fontSize: fontSize,
+                        fontFamily: chatFontFamily,
                       ),
                     ),
                   ),
@@ -681,6 +690,7 @@ class ChatMessageTile extends StatelessWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                       fontSize: fontSize - 2,
                       fontWeight: FontWeight.w400,
+                      fontFamily: chatFontFamily,
                     ),
                   ),
                 for (final segment in segments)
@@ -691,6 +701,7 @@ class ChatMessageTile extends StatelessWidget {
                         fontSize: fontSize,
                         color: message.isCheer ? cheerColor : null,
                         fontWeight: message.isCheer ? FontWeight.w600 : null,
+                        fontFamily: chatFontFamily,
                       ),
                     ),
                     EmoteSegment(:final emote) => WidgetSpan(

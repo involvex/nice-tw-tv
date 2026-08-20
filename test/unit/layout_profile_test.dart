@@ -26,4 +26,26 @@ void main() {
     final restored = StreamerLayoutProfile.fromJson(profile.toJson());
     expect(restored.theaterMode, isFalse);
   });
+
+  test('StreamerLayoutProfile accentArgb and qualityOverride round-trip', () {
+    const profile = StreamerLayoutProfile(
+      accentArgb: 0xFF1FA2A6,
+      qualityOverride: 'auto',
+    );
+    final restored = StreamerLayoutProfile.fromJson(profile.toJson());
+    expect(restored.accentArgb, 0xFF1FA2A6);
+    expect(restored.qualityOverride, 'auto');
+  });
+
+  test(
+    'StreamerLayoutProfile defaults for omitted accentArgb and qualityOverride',
+    () {
+      const profile = StreamerLayoutProfile();
+      expect(profile.accentArgb, null);
+      expect(profile.qualityOverride, null);
+      final restored = StreamerLayoutProfile.fromJson(profile.toJson());
+      expect(restored.accentArgb, null);
+      expect(restored.qualityOverride, null);
+    },
+  );
 }

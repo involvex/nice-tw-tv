@@ -148,6 +148,46 @@ class SettingsScreen extends ConsumerWidget {
               ref.read(settingsControllerProvider.notifier).setMaskLinks(value);
             },
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Chat font size scale'),
+            subtitle: const Text('Scale factor for chat message text size'),
+            trailing: Slider(
+              value: settings.chatFontSizeScale,
+              min: 0.5,
+              max: 2.0,
+              divisions: 15,
+              label: settings.chatFontSizeScale.roundToDouble().toStringAsFixed(
+                1,
+              ),
+              onChanged: (value) {
+                ref
+                    .read(settingsControllerProvider.notifier)
+                    .setChatFontSizeScale(value);
+              },
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Chat font family'),
+            subtitle: const Text('Font family for chat messages'),
+            trailing: DropdownButton<String>(
+              value: settings.chatFontFamily,
+              items: const [
+                DropdownMenuItem(value: 'Segoe UI', child: Text('Segoe UI')),
+                DropdownMenuItem(value: 'Roboto', child: Text('Roboto')),
+                DropdownMenuItem(value: 'Noto Sans', child: Text('Noto Sans')),
+                DropdownMenuItem(value: 'System', child: Text('System')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                ref
+                    .read(settingsControllerProvider.notifier)
+                    .setChatFontFamily(value);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
           if (AppSettings.canModerateChat(auth)) ...[
             const SizedBox(height: 16),
             const BlockedUsersSection(),

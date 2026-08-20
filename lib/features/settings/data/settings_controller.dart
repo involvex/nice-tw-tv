@@ -224,6 +224,16 @@ class SettingsController extends Notifier<AppSettings> {
     state = state.copyWith(maskLinks: value);
   }
 
+  Future<void> setChatFontSizeScale(double value) async {
+    await ref.read(settingsStorageProvider).setChatFontSizeScale(value);
+    state = state.copyWith(chatFontSizeScale: value);
+  }
+
+  Future<void> setChatFontFamily(String value) async {
+    await ref.read(settingsStorageProvider).setChatFontFamily(value);
+    state = state.copyWith(chatFontFamily: value);
+  }
+
   Future<void> applySettings(AppSettings next) async {
     final storage = ref.read(settingsStorageProvider);
     await storage.setThemeMode(AppSettings.themeModeToString(next.themeMode));

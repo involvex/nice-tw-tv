@@ -21,6 +21,8 @@ String buildExportPayload(AppSettings settings) {
     'quietHoursEnd': settings.quietHoursEnd,
     'chatTimestamps': settings.chatTimestamps,
     'maskLinks': settings.maskLinks,
+    'chatFontSizeScale': settings.chatFontSizeScale,
+    'chatFontFamily': settings.chatFontFamily,
   });
 }
 
@@ -45,6 +47,8 @@ AppSettings? parseExportPayload(String raw) {
       highContrast: json['highContrast'] as bool? ?? false,
       chatTimestamps: json['chatTimestamps'] as bool? ?? false,
       maskLinks: json['maskLinks'] as bool? ?? false,
+      chatFontSizeScale: json['chatFontSizeScale'] as double? ?? 1.0,
+      chatFontFamily: json['chatFontFamily'] as String? ?? 'Segoe UI',
       quietHoursEnabled: json['quietHoursEnabled'] as bool? ?? false,
       quietHoursStart: json['quietHoursStart'] as int? ?? 22 * 60,
       quietHoursEnd: json['quietHoursEnd'] as int? ?? 7 * 60,
