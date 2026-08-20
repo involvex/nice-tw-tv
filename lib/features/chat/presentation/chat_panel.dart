@@ -7,6 +7,7 @@ import 'package:nice_tv/features/chat/data/badge_catalog.dart';
 import 'package:nice_tv/features/chat/data/chat_client.dart';
 import 'package:nice_tv/features/chat/data/chat_search.dart';
 import 'package:nice_tv/features/chat/data/irc_message.dart';
+import 'package:nice_tv/features/chat/presentation/user_card_sheet.dart';
 import 'package:nice_tv/features/emotes/data/emote.dart';
 import 'package:nice_tv/features/emotes/data/seventv_events.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
@@ -302,6 +303,11 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                   badges: badges,
                   fontSize: fontSize,
                   onReply: canSend ? () => _startReply(msg) : null,
+                  onUserTap: () => showUserCard(
+                    context,
+                    login: msg.login,
+                    displayName: msg.displayName,
+                  ),
                 ),
               );
             },
@@ -558,6 +564,7 @@ class ChatMessageTile extends StatelessWidget {
     required this.badges,
     required this.fontSize,
     this.onReply,
+    this.onUserTap,
   });
 
   final ChatMessage message;
@@ -565,6 +572,7 @@ class ChatMessageTile extends StatelessWidget {
   final BadgeCatalog badges;
   final double fontSize;
   final VoidCallback? onReply;
+  final VoidCallback? onUserTap;
 
   @override
   Widget build(BuildContext context) {
@@ -639,12 +647,19 @@ class ChatMessageTile extends StatelessWidget {
                       fontSize: fontSize - 1,
                     ),
                   ),
-                TextSpan(
-                  text: '${message.displayName}: ',
-                  style: TextStyle(
-                    color: message.isCheer ? cheerColor : color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: fontSize,
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: GestureDetector(
+                    onTap: onUserTap,
+                    child: Text(
+                      '${message.displayName}: ',
+                      style: TextStyle(
+                        color: message.isCheer ? cheerColor : color,
+                        fontWeight: FontWeight.w700,
+                        fontSize: fontSize,
+                      ),
+                    ),
                   ),
                 ),
                 for (final segment in segments)
