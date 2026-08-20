@@ -10,6 +10,7 @@ import 'package:nice_tv/features/profile/presentation/channel_clips_shelf.dart';
 import 'package:nice_tv/features/profile/presentation/channel_schedule_shelf.dart';
 import 'package:nice_tv/features/profile/presentation/similar_streams_shelf.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ChannelProfileArgs {
   const ChannelProfileArgs({this.login, this.userId})
@@ -219,6 +220,21 @@ class ChannelProfileScreen extends ConsumerWidget {
                                               context.push('/notifications'),
                                           icon: const Icon(
                                             Icons.notifications_outlined,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton.filledTonal(
+                                          tooltip: 'Share channel',
+                                          onPressed: () async {
+                                            await SharePlus.instance.share(
+                                              ShareParams(
+                                                text:
+                                                    'https://www.twitch.tv/${user.login}',
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.share_outlined,
                                           ),
                                         ),
                                         if (data.live != null) ...[
