@@ -4,6 +4,20 @@ A curated set of features that can be implemented on top of the current Nice TV 
 
 ---
 
+## 0. Recently Implemented
+
+> **Note:** These features already exist in the codebase and do not require implementation.
+
+- **Continue Watching Shelf** — `lib/features/home/presentation/continue_watching_shelf.dart` + `lib/features/vod/data/continue_watching_provider.dart`; rendered on the home screen.
+- **Mini player** — floating PiP-style overlay via `lib/features/watch/presentation/mini_player.dart` + `lib/features/watch/data/player_overlay_controller.dart`.
+- **Similar streams shelf** — `lib/features/profile/presentation/similar_streams_shelf.dart` on channel profiles.
+- **Category browse & category autoplay feeds** — `category_browse_screen.dart`, `category_autoplay_feed.dart`, routes `/category/:id` and `/category/:id/autoplay`.
+- **Search history** — recent queries via `lib/features/search/data/search_history_controller.dart`.
+- **Chat reply system** — long-press a message to reply in `lib/features/chat/presentation/chat_panel.dart`.
+- **Emote search & picker** — emote search field and picker in `lib/features/chat/presentation/chat_panel.dart`.
+
+---
+
 ## 1. Chat UX & Moderation
 
 ### 1.1 User Cards (tap username)
@@ -113,6 +127,7 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - `lib/features/home/presentation/home_screen.dart`
 - `lib/features/vod/presentation/vod_screen.dart`
 - `lib/features/vod/data/vod_progress_store.dart` (already exists)
+**Status:** Already implemented via `lib/features/home/presentation/continue_watching_shelf.dart`, `lib/features/vod/data/continue_watching_provider.dart`, and rendered in `home_screen.dart`.
 
 ---
 
@@ -268,11 +283,72 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - New: `lib/features/watch/presentation/multi_stream_screen.dart`
 - `lib/core/routing/app_router.dart`
 
-### 10.2 Stream Delay Indicator
-**Priority:** Low
-**Rationale:** Estimate and display current stream delay (Twitch low-latency vs. normal).
+---
+
+## 11. New Opportunities
+
+### 11.1 Moderation Actions (Timeout / Ban)
+**Priority:** Medium
+**Rationale:** Logged-in moderators can currently only read chat. Add long-press actions to timeout or ban a user via IRC commands (`/timeout`, `/ban`), with a confirmation dialog.
 **Affected files:**
+- `lib/features/chat/presentation/chat_panel.dart`
+- `lib/features/chat/data/chat_client.dart`
+
+### 11.2 Chat Room State Indicators
+**Priority:** Low
+**Rationale:** Parse IRC `ROOMSTATE` tags (slow mode, follower-only, subscriber-only, emote-only) and show small badges above the chat so users know posting constraints.
+**Affected files:**
+- `lib/features/chat/data/irc_message.dart`
+- `lib/features/chat/presentation/chat_panel.dart`
+
+### 11.3 Chat History Persistence
+**Priority:** Medium
+**Rationale:** Currently chat is only kept in memory for a session. Persist the last ~200 messages per channel to `SharedPreferences` so history survives app restarts, and surface it as an explicit history view.
+**Affected files:**
+- New: `lib/features/chat/data/chat_history_store.dart`
+- `lib/features/chat/presentation/chat_panel.dart`
+
+### 11.4 Stream Schedule on Channel Profile
+**Priority:** Medium
+**Rationale:** Fetch the streamer's weekly broadcast schedule via Twitch GQL (as `TwitchGqlClient` already does for follow state) and render it on the profile screen.
+**Affected files:**
+- `lib/features/profile/data/twitch_gql_client.dart`
+- `lib/features/profile/presentation/channel_profile_screen.dart`
+
+### 11.5 Clips Tab on Channel Profile
+**Priority:** Low
+**Rationale:** `TwitchClip` and `HelixRepository.getClips` already exist; surface a channel's recent clips on the profile screen instead of only in search/feed.
+**Affected files:**
+- `lib/features/home/data/helix_repository.dart` (exists)
+- `lib/features/profile/presentation/channel_profile_screen.dart`
+
+### 11.6 Per-Channel Player & Theme Overrides
+**Priority:** Low
+**Rationale:** Layout profiles already exist per streamer; extend them to also override chat background theme, accent color, or volume/quality defaults per channel.
+**Affected files:**
+- `lib/features/settings/data/layout_profile.dart`
 - `lib/features/watch/presentation/watch_screen.dart`
+
+### 11.7 Account Switcher / Multi-Account
+**Priority:** Medium
+**Rationale:** Let users store multiple Twitch OAuth tokens and switch between accounts without logging out. Persist token list in `flutter_secure_storage`.
+**Affected files:**
+- `lib/features/auth/data/auth_repository.dart`
+- `lib/features/settings/presentation/settings_screen.dart`
+
+### 11.8 Autoplay Next VOD in Series
+**Priority:** Low
+**Rationale:** When a VOD ends, automatically open the next recent archive from the same channel (via `HelixRepository.getVods`).
+**Affected files:**
+- `lib/features/vod/presentation/vod_screen.dart`
+- `lib/features/home/data/helix_repository.dart`
+
+### 11.9 Search Within Watch History
+**Priority:** Low
+**Rationale:** Add a filter field to the history screen so users can find a specific watched stream/VOD by title or channel.
+**Affected files:**
+- `lib/features/history/presentation/history_screen.dart`
+- `lib/features/history/data/history_controller.dart`
 
 ---
 
@@ -287,4 +363,4 @@ A curated set of features that can be implemented on top of the current Nice TV 
 
 ---
 
-*Last updated: 2026-08-14*
+*Last updated: 2026-08-20*
