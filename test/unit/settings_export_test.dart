@@ -39,6 +39,8 @@ void main() {
       expect(restored.quietHoursEnabled, isTrue);
       expect(restored.quietHoursStart, 23 * 60);
       expect(restored.quietHoursEnd, 6 * 60);
+      expect(restored.chatTimestamps, false);
+      expect(restored.maskLinks, false);
     });
 
     test('defaults for omitted fields', () {
@@ -50,7 +52,9 @@ void main() {
       expect(restored!.discoveryHideMature, isFalse);
       expect(restored.videoVolume, 0.7);
       expect(restored.highContrast, isFalse);
-      expect(restored.quietHoursEnabled, isFalse);
+      expect(restored.chatTimestamps, isFalse);
+      expect(restored.maskLinks, isFalse);
+      expect(restored!.quietHoursEnabled, isFalse);
     });
 
     test('returns null for malformed input', () {

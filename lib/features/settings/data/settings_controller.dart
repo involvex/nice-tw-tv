@@ -21,6 +21,10 @@ class AppSettings {
     this.quietHoursEnabled = false,
     this.quietHoursStart = 22 * 60,
     this.quietHoursEnd = 7 * 60,
+    this.chatTimestamps = false,
+    this.maskLinks = false,
+    this.chatFontSizeScale = 1.0,
+    this.chatFontFamily = 'Segoe UI',
   });
 
   final ThemeMode themeMode;
@@ -37,6 +41,10 @@ class AppSettings {
   final bool quietHoursEnabled;
   final int quietHoursStart;
   final int quietHoursEnd;
+  final bool chatTimestamps;
+  final bool maskLinks;
+  final double chatFontSizeScale;
+  final String chatFontFamily;
 
   Color get accent => Color(accentArgb);
 
@@ -55,6 +63,10 @@ class AppSettings {
     bool? quietHoursEnabled,
     int? quietHoursStart,
     int? quietHoursEnd,
+    bool? chatTimestamps,
+    bool? maskLinks,
+    double? chatFontSizeScale,
+    String? chatFontFamily,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -71,6 +83,10 @@ class AppSettings {
       quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
       quietHoursStart: quietHoursStart ?? this.quietHoursStart,
       quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
+      chatTimestamps: chatTimestamps ?? this.chatTimestamps,
+      maskLinks: maskLinks ?? this.maskLinks,
+      chatFontSizeScale: chatFontSizeScale ?? this.chatFontSizeScale,
+      chatFontFamily: chatFontFamily ?? this.chatFontFamily,
     );
   }
 
@@ -121,6 +137,10 @@ class SettingsController extends Notifier<AppSettings> {
       quietHoursEnabled: storage.quietHoursEnabled,
       quietHoursStart: storage.quietHoursStart,
       quietHoursEnd: storage.quietHoursEnd,
+      chatTimestamps: storage.chatTimestamps,
+      maskLinks: storage.maskLinks,
+      chatFontSizeScale: storage.chatFontSizeScale,
+      chatFontFamily: storage.chatFontFamily,
     );
   }
 
@@ -194,6 +214,16 @@ class SettingsController extends Notifier<AppSettings> {
     state = state.copyWith(quietHoursStart: start, quietHoursEnd: end);
   }
 
+  Future<void> setChatTimestamps(bool value) async {
+    await ref.read(settingsStorageProvider).setChatTimestamps(value);
+    state = state.copyWith(chatTimestamps: value);
+  }
+
+  Future<void> setMaskLinks(bool value) async {
+    await ref.read(settingsStorageProvider).setMaskLinks(value);
+    state = state.copyWith(maskLinks: value);
+  }
+
   Future<void> applySettings(AppSettings next) async {
     final storage = ref.read(settingsStorageProvider);
     await storage.setThemeMode(AppSettings.themeModeToString(next.themeMode));
@@ -212,6 +242,8 @@ class SettingsController extends Notifier<AppSettings> {
       start: next.quietHoursStart,
       end: next.quietHoursEnd,
     );
+    await storage.setChatTimestamps(next.chatTimestamps);
+    await storage.setMaskLinks(next.maskLinks);
     state = next;
   }
 }

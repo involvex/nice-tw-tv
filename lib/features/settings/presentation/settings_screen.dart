@@ -128,6 +128,26 @@ class SettingsScreen extends ConsumerWidget {
                   .setChatDensity(set.first);
             },
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Chat timestamps'),
+            subtitle: const Text('Show timestamp next to each message'),
+            value: settings.chatTimestamps,
+            onChanged: (value) {
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setChatTimestamps(value);
+            },
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Mask links'),
+            subtitle: const Text('Hide raw URLs in chat messages'),
+            value: settings.maskLinks,
+            onChanged: (value) {
+              ref.read(settingsControllerProvider.notifier).setMaskLinks(value);
+            },
+          ),
           if (AppSettings.canModerateChat(auth)) ...[
             const SizedBox(height: 16),
             const BlockedUsersSection(),

@@ -53,6 +53,10 @@ class SettingsStorage {
   static const quietHoursEnabledKey = 'quiet_hours_enabled';
   static const quietHoursStartKey = 'quiet_hours_start';
   static const quietHoursEndKey = 'quiet_hours_end';
+  static const chatFontSizeScaleKey = 'chat_font_size_scale';
+  static const chatFontFamilyKey = 'chat_font_family';
+  static const chatTimestampsKey = 'chat_timestamps';
+  static const maskLinksKey = 'mask_links';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -129,4 +133,24 @@ class SettingsStorage {
     await _prefs.setInt(quietHoursStartKey, start);
     await _prefs.setInt(quietHoursEndKey, end);
   }
+
+  double get chatFontSizeScale => _prefs.getDouble(chatFontSizeScaleKey) ?? 1.0;
+
+  Future<void> setChatFontSizeScale(double value) =>
+      _prefs.setDouble(chatFontSizeScaleKey, value);
+
+  String get chatFontFamily =>
+      _prefs.getString(chatFontFamilyKey) ?? 'Segoe UI';
+
+  Future<void> setChatFontFamily(String value) =>
+      _prefs.setString(chatFontFamilyKey, value);
+
+  bool get chatTimestamps => _prefs.getBool(chatTimestampsKey) ?? false;
+
+  Future<void> setChatTimestamps(bool value) =>
+      _prefs.setBool(chatTimestampsKey, value);
+
+  bool get maskLinks => _prefs.getBool(maskLinksKey) ?? false;
+
+  Future<void> setMaskLinks(bool value) => _prefs.setBool(maskLinksKey, value);
 }

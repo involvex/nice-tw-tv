@@ -357,3 +357,19 @@ List<ChatMessage> filterBlocked(
   if (blocked.isEmpty) return messages;
   return messages.where((m) => m.system || !blocked.contains(m.login)).toList();
 }
+
+final RegExp _urlRegex = RegExp(r'https?://\S+');
+
+/// Replaces every URL in [text] with the masked placeholder `[link]`.
+/// Used by link-protection / spoiler mode so raw URLs are not displayed.
+String maskLinksInText(String text) {
+  if (text.isEmpty) return text;
+  return text.replaceAllMapped(_urlRegex, (_) => '[link]');
+}
+
+/// Formats a chat message timestamp as `HH:mm` (24-hour, zero-padded).
+String formatChatTimestamp(DateTime timestamp) {
+  final h = timestamp.hour.toString().padLeft(2, '0');
+  final m = timestamp.minute.toString().padLeft(2, '0');
+  return '$h:$m';
+}

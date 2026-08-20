@@ -153,6 +153,12 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     final density =
         widget.densityOverride ??
         ref.watch(settingsControllerProvider.select((s) => s.chatDensity));
+    final chatTimestamps = ref.watch(
+      settingsControllerProvider.select((s) => s.chatTimestamps),
+    );
+    final maskLinks = ref.watch(
+      settingsControllerProvider.select((s) => s.maskLinks),
+    );
     final pad = switch (density) {
       0 => 4.0,
       2 => 10.0,
@@ -302,6 +308,8 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                   catalog: catalog,
                   badges: badges,
                   fontSize: fontSize,
+                  showTimestamp: chatTimestamps,
+                  maskLinks: maskLinks,
                   onReply: canSend ? () => _startReply(msg) : null,
                   onUserTap: () => showUserCard(
                     context,
@@ -563,6 +571,8 @@ class ChatMessageTile extends StatelessWidget {
     required this.catalog,
     required this.badges,
     required this.fontSize,
+    this.showTimestamp = false,
+    this.maskLinks = false,
     this.onReply,
     this.onUserTap,
   });
@@ -571,6 +581,8 @@ class ChatMessageTile extends StatelessWidget {
   final EmoteCatalog catalog;
   final BadgeCatalog badges;
   final double fontSize;
+  final bool showTimestamp;
+  final bool maskLinks;
   final VoidCallback? onReply;
   final VoidCallback? onUserTap;
 
@@ -662,10 +674,19 @@ class ChatMessageTile extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (showTimestamp)
+                  TextSpan(
+                    text: '${formatChatTimestamp(message.timestamp)} ',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: fontSize - 2,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
                 for (final segment in segments)
                   switch (segment) {
                     TextSegment(:final value) => TextSpan(
-                      text: value,
+                      text: maskLinks ? maskLinksInText(value) : value,
                       style: TextStyle(
                         fontSize: fontSize,
                         color: message.isCheer ? cheerColor : null,

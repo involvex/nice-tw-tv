@@ -19,6 +19,8 @@ String buildExportPayload(AppSettings settings) {
     'quietHoursEnabled': settings.quietHoursEnabled,
     'quietHoursStart': settings.quietHoursStart,
     'quietHoursEnd': settings.quietHoursEnd,
+    'chatTimestamps': settings.chatTimestamps,
+    'maskLinks': settings.maskLinks,
   });
 }
 
@@ -41,6 +43,8 @@ AppSettings? parseExportPayload(String raw) {
       videoMuted: json['videoMuted'] as bool? ?? false,
       playbackSpeed: (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0,
       highContrast: json['highContrast'] as bool? ?? false,
+      chatTimestamps: json['chatTimestamps'] as bool? ?? false,
+      maskLinks: json['maskLinks'] as bool? ?? false,
       quietHoursEnabled: json['quietHoursEnabled'] as bool? ?? false,
       quietHoursStart: json['quietHoursStart'] as int? ?? 22 * 60,
       quietHoursEnd: json['quietHoursEnd'] as int? ?? 7 * 60,
