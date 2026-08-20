@@ -193,6 +193,27 @@ class SettingsController extends Notifier<AppSettings> {
         .setQuietHours(start: start, end: end);
     state = state.copyWith(quietHoursStart: start, quietHoursEnd: end);
   }
+
+  Future<void> applySettings(AppSettings next) async {
+    final storage = ref.read(settingsStorageProvider);
+    await storage.setThemeMode(AppSettings.themeModeToString(next.themeMode));
+    await storage.setAccentArgb(next.accentArgb);
+    await storage.setChatDensity(next.chatDensity);
+    await storage.setVideoQuality(next.videoQuality);
+    await storage.setDiscoveryLanguage(next.discoveryLanguage);
+    await storage.setDiscoveryHideMature(next.discoveryHideMature);
+    await storage.setDiscoverySortOrder(next.discoverySortOrder);
+    await storage.setVideoVolume(next.videoVolume);
+    await storage.setVideoMuted(next.videoMuted);
+    await storage.setPlaybackSpeed(next.playbackSpeed);
+    await storage.setHighContrast(next.highContrast);
+    await storage.setQuietHoursEnabled(next.quietHoursEnabled);
+    await storage.setQuietHours(
+      start: next.quietHoursStart,
+      end: next.quietHoursEnd,
+    );
+    state = next;
+  }
 }
 
 final settingsControllerProvider =

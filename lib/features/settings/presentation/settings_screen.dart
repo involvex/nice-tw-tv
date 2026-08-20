@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/notifications/data/muted_channels_store.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
+import 'package:nice_tv/features/settings/data/settings_export.dart';
 import 'package:nice_tv/features/settings/presentation/blocked_users_section.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -362,6 +364,71 @@ class SettingsScreen extends ConsumerWidget {
           Text(
             'Native HLS is experimental (GQL/Usher). '
             'Per-streamer layout profiles are edited from the watch screen customize button.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text('Backup', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final payload = buildExportPayload(
+                      ref.read(settingsControllerProvider),
+                    );
+                    await Clipboard.setData(ClipboardData(text: payload));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Settings copied to clipboard'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_outlined),
+                  label: const Text('Export'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final data = await Clipboard.getData('text/plain');
+                    final text = data?.text;
+                    final restored = text == null
+                        ? null
+                        : parseExportPayload(text);
+                    if (restored == null) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Clipboard does not contain a valid Nice TV export',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    await ref
+                        .read(settingsControllerProvider.notifier)
+                        .applySettings(restored);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Settings imported')),
+                    );
+                  },
+                  icon: const Icon(Icons.paste_outlined),
+                  label: const Text('Import'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Export copies your settings as JSON to the clipboard. '
+            'Import reads a JSON payload from the clipboard and applies it.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
