@@ -18,6 +18,9 @@ class AppSettings {
     this.videoMuted = false,
     this.playbackSpeed = 1.0,
     this.highContrast = false,
+    this.quietHoursEnabled = false,
+    this.quietHoursStart = 22 * 60,
+    this.quietHoursEnd = 7 * 60,
   });
 
   final ThemeMode themeMode;
@@ -31,6 +34,9 @@ class AppSettings {
   final bool videoMuted;
   final double playbackSpeed;
   final bool highContrast;
+  final bool quietHoursEnabled;
+  final int quietHoursStart;
+  final int quietHoursEnd;
 
   Color get accent => Color(accentArgb);
 
@@ -46,6 +52,9 @@ class AppSettings {
     bool? videoMuted,
     double? playbackSpeed,
     bool? highContrast,
+    bool? quietHoursEnabled,
+    int? quietHoursStart,
+    int? quietHoursEnd,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -59,6 +68,9 @@ class AppSettings {
       videoMuted: videoMuted ?? this.videoMuted,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       highContrast: highContrast ?? this.highContrast,
+      quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+      quietHoursStart: quietHoursStart ?? this.quietHoursStart,
+      quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
     );
   }
 
@@ -106,6 +118,9 @@ class SettingsController extends Notifier<AppSettings> {
       videoMuted: storage.videoMuted,
       playbackSpeed: storage.playbackSpeed,
       highContrast: storage.highContrast,
+      quietHoursEnabled: storage.quietHoursEnabled,
+      quietHoursStart: storage.quietHoursStart,
+      quietHoursEnd: storage.quietHoursEnd,
     );
   }
 
@@ -165,6 +180,18 @@ class SettingsController extends Notifier<AppSettings> {
   Future<void> setHighContrast(bool value) async {
     await ref.read(settingsStorageProvider).setHighContrast(value);
     state = state.copyWith(highContrast: value);
+  }
+
+  Future<void> setQuietHoursEnabled(bool value) async {
+    await ref.read(settingsStorageProvider).setQuietHoursEnabled(value);
+    state = state.copyWith(quietHoursEnabled: value);
+  }
+
+  Future<void> setQuietHours({required int start, required int end}) async {
+    await ref
+        .read(settingsStorageProvider)
+        .setQuietHours(start: start, end: end);
+    state = state.copyWith(quietHoursStart: start, quietHoursEnd: end);
   }
 }
 

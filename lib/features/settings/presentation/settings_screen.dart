@@ -226,6 +226,83 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+          const SizedBox(height: 24),
+          Text('Notifications', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Do Not Disturb'),
+            subtitle: const Text(
+              'Silence live-alert notifications during quiet hours',
+            ),
+            value: settings.quietHoursEnabled,
+            onChanged: (value) {
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setQuietHoursEnabled(value);
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Quiet hours start'),
+                  subtitle: Text(_formatTime(settings.quietHoursStart)),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(
+                        DateTime(
+                          2026,
+                          1,
+                          1,
+                          settings.quietHoursStart ~/ 60,
+                          settings.quietHoursStart % 60,
+                        ),
+                      ),
+                    );
+                    if (picked == null) return;
+                    await ref
+                        .read(settingsControllerProvider.notifier)
+                        .setQuietHours(
+                          start: picked.hour * 60 + picked.minute,
+                          end: settings.quietHoursEnd,
+                        );
+                  },
+                ),
+              ),
+              Expanded(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Quiet hours end'),
+                  subtitle: Text(_formatTime(settings.quietHoursEnd)),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(
+                        DateTime(
+                          2026,
+                          1,
+                          1,
+                          settings.quietHoursEnd ~/ 60,
+                          settings.quietHoursEnd % 60,
+                        ),
+                      ),
+                    );
+                    if (picked == null) return;
+                    await ref
+                        .read(settingsControllerProvider.notifier)
+                        .setQuietHours(
+                          start: settings.quietHoursStart,
+                          end: picked.hour * 60 + picked.minute,
+                        );
+                  },
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Text('Player backend', style: theme.textTheme.titleSmall),
           const SizedBox(height: 8),
@@ -266,4 +343,12 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _formatTime(int minutesSinceMidnight) {
+  final h = minutesSinceMidnight ~/ 60;
+  final m = minutesSinceMidnight % 60;
+  final hour12 = h % 12 == 0 ? 12 : h % 12;
+  final ampm = h < 12 ? 'AM' : 'PM';
+  return '$hour12:${m.toString().padLeft(2, '0')} $ampm';
 }

@@ -9,6 +9,7 @@ import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/notifications/data/eventsub_client.dart';
 import 'package:nice_tv/features/notifications/data/local_push_service.dart';
+import 'package:nice_tv/features/settings/data/quiet_hours.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -258,8 +259,17 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
     await _saveItems(nextItems);
     state = state.copyWith(items: nextItems);
     if (notify) {
+      final settings = ref.read(settingsControllerProvider);
+      final inQuiet =
+          settings.quietHoursEnabled &&
+          isInQuietHours(
+            DateTime.now(),
+            settings.quietHoursStart,
+            settings.quietHoursEnd,
+          );
       final push = ref.read(localPushServiceProvider);
       for (final item in novel) {
+        if (inQuiet) continue;
         await push.showWentLive(item);
       }
     }

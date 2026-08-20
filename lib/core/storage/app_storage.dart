@@ -50,6 +50,9 @@ class SettingsStorage {
   static const videoMutedKey = 'video_muted';
   static const playbackSpeedKey = 'playback_speed';
   static const highContrastKey = 'high_contrast';
+  static const quietHoursEnabledKey = 'quiet_hours_enabled';
+  static const quietHoursStartKey = 'quiet_hours_start';
+  static const quietHoursEndKey = 'quiet_hours_end';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -112,4 +115,18 @@ class SettingsStorage {
 
   Future<void> setHighContrast(bool value) =>
       _prefs.setBool(highContrastKey, value);
+
+  bool get quietHoursEnabled => _prefs.getBool(quietHoursEnabledKey) ?? false;
+
+  Future<void> setQuietHoursEnabled(bool value) =>
+      _prefs.setBool(quietHoursEnabledKey, value);
+
+  int get quietHoursStart => _prefs.getInt(quietHoursStartKey) ?? 22 * 60;
+
+  int get quietHoursEnd => _prefs.getInt(quietHoursEndKey) ?? 7 * 60;
+
+  Future<void> setQuietHours({required int start, required int end}) async {
+    await _prefs.setInt(quietHoursStartKey, start);
+    await _prefs.setInt(quietHoursEndKey, end);
+  }
 }
