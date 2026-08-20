@@ -6,6 +6,7 @@ import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/profile/data/follow_controller.dart';
+import 'package:nice_tv/features/profile/presentation/channel_clips_shelf.dart';
 import 'package:nice_tv/features/profile/presentation/channel_schedule_shelf.dart';
 import 'package:nice_tv/features/profile/presentation/similar_streams_shelf.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
@@ -272,6 +273,7 @@ class ChannelProfileScreen extends ConsumerWidget {
                           excludeUserId: user.id,
                         ),
                       ChannelScheduleShelf(broadcasterId: user.id),
+                      ChannelClipsShelf(broadcasterId: user.id),
                       const SizedBox(height: 24),
                       Text('Recent VODs', style: theme.textTheme.titleMedium),
                     ],
