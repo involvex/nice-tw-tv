@@ -80,23 +80,9 @@ class HelixRepository {
       queryParameters: {'query': query.trim(), 'first': 20, 'live_only': true},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    final streams = data.map((raw) {
-      final json = raw as Map<String, dynamic>;
-      return TwitchStream(
-        id: json['id'] as String? ?? '',
-        userId: json['id'] as String? ?? '',
-        userLogin: json['broadcaster_login'] as String? ?? '',
-        userName: json['display_name'] as String? ?? '',
-        gameName: json['game_name'] as String? ?? '',
-        gameId: json['game_id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        viewerCount: 0,
-        thumbnailUrl: json['thumbnail_url'] as String? ?? '',
-        startedAt: DateTime.now(),
-        isMature: json['is_mature'] as bool? ?? false,
-        language: json['broadcaster_language'] as String? ?? 'en',
-      );
-    }).toList();
+    final streams = data
+        .map((e) => TwitchStream.fromJson(e as Map<String, dynamic>))
+        .toList();
     return StreamsPage(streams: streams);
   }
 

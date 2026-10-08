@@ -594,20 +594,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall,
                       ),
-                    if (_pipSupported)
-                      PopupMenuItem(
-                        value: 'pip',
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.picture_in_picture_outlined,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            const Text('Picture in picture'),
-                          ],
-                        ),
-                      ),
                   ],
                 ),
                 actions: [
@@ -701,12 +687,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
                     },
                     icon: const Icon(Icons.share_outlined),
                   ),
-                  if (_pipSupported)
-                    IconButton(
-                      tooltip: 'Picture in picture',
-                      onPressed: () => PipService.enter(),
-                      icon: const Icon(Icons.picture_in_picture_alt_outlined),
-                    ),
                   PopupMenuButton<String>(
                     tooltip: 'More options',
                     icon: const Icon(Icons.more_vert),
@@ -780,6 +760,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
                           ],
                         ),
                       ),
+                      const PopupMenuDivider(),
+                      if (_pipSupported)
+                        PopupMenuItem(
+                          value: 'pip',
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.picture_in_picture_outlined,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Picture in picture'),
+                            ],
+                          ),
+                        ),
                     ],
                     onSelected: (value) async {
                       if (value == 'layout') {

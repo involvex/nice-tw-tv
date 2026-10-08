@@ -95,9 +95,10 @@ class _AutoplayPageState extends ConsumerState<_AutoplayPage> {
     if (oldWidget.active && !widget.active) {
       _playerKey.currentState?.pause();
     }
-    // Sync player mute state when global mute state changes
+    // Sync player mute state when page becomes active or when global mute state changes.
     // Defer to avoid "Tried to modify a provider while the widget tree was building"
-    if (oldWidget.initialMuted != widget.initialMuted) {
+    if (widget.active &&
+        (oldWidget.initialMuted != widget.initialMuted || !oldWidget.active)) {
       final muted = widget.initialMuted;
       Future.microtask(() {
         if (mounted) {

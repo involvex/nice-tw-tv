@@ -30,9 +30,18 @@ class TwitchStream {
   factory TwitchStream.fromJson(Map<String, dynamic> json) {
     return TwitchStream(
       id: json['id'] as String? ?? '',
-      userId: json['user_id'] as String? ?? '',
-      userLogin: json['user_login'] as String? ?? '',
-      userName: json['user_name'] as String? ?? '',
+      userId:
+          (json['user_id'] ?? json['broadcaster_id'] ?? json['id'])
+              as String? ??
+          '',
+      userLogin:
+          (json['user_login'] ?? json['broadcaster_login']) as String? ?? '',
+      userName:
+          (json['user_name'] ??
+                  json['broadcaster_name'] ??
+                  json['display_name'])
+              as String? ??
+          '',
       gameName: json['game_name'] as String? ?? '',
       gameId: json['game_id'] as String? ?? '',
       title: json['title'] as String? ?? '',
@@ -42,7 +51,8 @@ class TwitchStream {
           DateTime.tryParse(json['started_at'] as String? ?? '') ??
           DateTime.now(),
       isMature: json['is_mature'] as bool? ?? false,
-      language: json['language'] as String? ?? 'en',
+      language:
+          (json['language'] ?? json['broadcaster_language']) as String? ?? 'en',
     );
   }
 
