@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
@@ -59,6 +60,17 @@ class FollowController extends AsyncNotifier<FollowState> {
         FollowState(isFollowing: !current.isFollowing, isLoading: false),
       );
       ref.invalidate(followingFeedControllerProvider);
+    } on DioException catch (e) {
+      state = AsyncData(
+        FollowState(isFollowing: current.isFollowing, isLoading: false),
+      );
+      // If auth token is expired or invalid (401), log out so the
+      // UI can prompt the user to sign in again.
+      if (e.response?.statusCode == 401) {
+        await ref.read(authRepositoryProvider).logout();
+        throw const SignInRequiredException();
+      }
+      rethrow;
     } on Object {
       state = AsyncData(
         FollowState(isFollowing: current.isFollowing, isLoading: false),

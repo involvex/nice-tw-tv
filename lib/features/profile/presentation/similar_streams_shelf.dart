@@ -44,7 +44,7 @@ class SimilarStreamsShelf extends ConsumerWidget {
       data: (streams) {
         if (streams.isEmpty) return const SizedBox.shrink();
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 24),
             Text('Similar live streams', style: theme.textTheme.titleMedium),

@@ -100,9 +100,15 @@ class _AutoplayPageState extends ConsumerState<_AutoplayPage> {
     if (widget.active &&
         (oldWidget.initialMuted != widget.initialMuted || !oldWidget.active)) {
       final muted = widget.initialMuted;
+      final isNewActive = !oldWidget.active;
       Future.microtask(() {
         if (mounted) {
           _playerKey.currentState?.setMuted(muted);
+          // Resume playback if this page just became active (fixes sound desync
+          // when swiping back to a previously paused page after a hot reload).
+          if (isNewActive) {
+            _playerKey.currentState?.play();
+          }
         }
       });
     }

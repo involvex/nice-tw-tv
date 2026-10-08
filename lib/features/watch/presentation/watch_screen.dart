@@ -142,8 +142,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // When opened from PiP tap, hide UI after a few seconds of inactivity.
+    // When opened from PiP tap, start with UI hidden for clean viewing.
+    // Tap anywhere to reveal; UI auto-hides after 3s of inactivity.
     if (widget.fromPip) {
+      _uiHidden = true;
       _uiHideTimer = Timer(const Duration(seconds: 3), () {
         if (mounted) setState(() => _uiHidden = true);
       });
@@ -585,11 +587,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
       densityOverride: profile.chatDensity,
     );
 
-    // When opened from PiP tap, start with UI hidden for clean viewing.
-    if (widget.fromPip && !_uiHidden) {
-      _uiHidden = true;
-    }
-
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -804,6 +801,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                       if (value == 'layout') {
                         _openLayoutSheet();
                       } else if (value == 'pip') {
+                        // Pause the active player before entering PiP to
+                        // prevent native SurfaceControl crashes.
+                        if (useNative) {
+                          _nativeKey.currentState?.player.pause();
+                        } else {
+                          await _embedKey.currentState?.pause();
+                        }
                         await PipService.enter();
                       } else if (value == 'theater') {
                         _saveProfile(

@@ -30,7 +30,7 @@ class ChannelPanelsSection extends ConsumerWidget {
         }
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 16),
             Text('About & Panels', style: theme.textTheme.titleMedium),

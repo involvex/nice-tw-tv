@@ -19,7 +19,7 @@ class ChannelScheduleShelf extends ConsumerWidget {
       data: (segments) {
         if (segments.isEmpty) return const SizedBox.shrink();
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 24),
             Text('Upcoming schedule', style: theme.textTheme.titleMedium),

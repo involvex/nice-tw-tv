@@ -32,7 +32,7 @@ class ChannelClipsShelf extends ConsumerWidget {
       data: (clips) {
         if (clips.isEmpty) return const SizedBox.shrink();
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 24),
             Text('Top clips', style: theme.textTheme.titleMedium),

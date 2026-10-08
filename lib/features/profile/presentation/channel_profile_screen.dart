@@ -157,8 +157,9 @@ class ChannelProfileScreen extends ConsumerWidget {
                                     final isLoading =
                                         followState.value?.isLoading ?? false;
 
-                                    return Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                    return Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
                                       children: [
                                         FilledButton.icon(
                                           onPressed: isLoading
@@ -217,7 +218,6 @@ class ChannelProfileScreen extends ConsumerWidget {
                                                 : 'Follow',
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
                                         IconButton.filledTonal(
                                           tooltip: 'Notifications',
                                           onPressed: () =>
@@ -226,7 +226,6 @@ class ChannelProfileScreen extends ConsumerWidget {
                                             Icons.notifications_outlined,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
                                         IconButton.filledTonal(
                                           tooltip: 'Share channel',
                                           onPressed: () async {
@@ -241,8 +240,7 @@ class ChannelProfileScreen extends ConsumerWidget {
                                             Icons.share_outlined,
                                           ),
                                         ),
-                                        if (data.live != null) ...[
-                                          const SizedBox(width: 8),
+                                        if (data.live != null)
                                           FilledButton(
                                             onPressed: () {
                                               final uri = Uri(
@@ -256,7 +254,6 @@ class ChannelProfileScreen extends ConsumerWidget {
                                             },
                                             child: const Text('Watch live'),
                                           ),
-                                        ],
                                       ],
                                     );
                                   },
