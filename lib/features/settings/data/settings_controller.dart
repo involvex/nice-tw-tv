@@ -188,7 +188,8 @@ class SettingsController extends Notifier<AppSettings> {
   }
 
   Future<void> setVideoMuted(bool muted) async {
-    await ref.read(settingsStorageProvider).setVideoMuted(muted);
+    // Mute is per-session only — do not persist to storage.
+    // This prevents muting one stream from muting all subsequent streams.
     state = state.copyWith(videoMuted: muted);
   }
 

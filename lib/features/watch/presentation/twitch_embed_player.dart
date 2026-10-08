@@ -324,6 +324,10 @@ class TwitchEmbedPlayerState extends State<TwitchEmbedPlayer> {
 
   @override
   void dispose() {
+    _controller
+        ?.runJavaScript('window.NiceTvPause && NiceTvPause();')
+        .catchError((_) {});
+    _controller = null;
     super.dispose();
   }
 

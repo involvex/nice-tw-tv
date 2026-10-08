@@ -69,7 +69,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
         stream.channelLogin == widget.channelLogin &&
         stream.vodId == widget.vodId &&
         stream.clipId == widget.clipId) {
-      ref.read(miniPlayerControllerProvider.notifier).close();
+      // Defer to avoid "Tried to modify a provider while the widget tree was building"
+      Future.microtask(() {
+        if (mounted) {
+          ref.read(miniPlayerControllerProvider.notifier).close();
+        }
+      });
     }
   }
 
@@ -125,9 +130,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
                 .playbackSpeed,
           ),
         );
-    if (_pipSupported) {
-      PipService.enter();
-    }
   }
 
   @override
@@ -668,26 +670,37 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
                 icon: const Icon(Icons.picture_in_picture_alt_outlined),
               ),
             PopupMenuButton<String>(
-              tooltip: 'Quality',
-              initialValue: _activeQuality ?? quality,
-              onSelected: _setQuality,
+              tooltip: 'More options',
+              icon: const Icon(Icons.more_vert),
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'quality',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.high_quality_outlined, size: 20),
+                      const SizedBox(width: 12),
+                      Text(_activeQuality ?? quality),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
                 for (final q in _qualities)
-                  PopupMenuItem(value: q, child: Text(q)),
-              ],
-              icon: const Icon(Icons.high_quality_outlined),
-            ),
-            PopupMenuButton<double>(
-              tooltip: 'Speed',
-              initialValue: settings.playbackSpeed,
-              onSelected: (speed) async {
-                await ref
-                    .read(settingsControllerProvider.notifier)
-                    .setPlaybackSpeed(speed);
-                await _nativeKey.currentState?.setPlaybackSpeed(speed);
-                await _embedKey.currentState?.setPlaybackSpeed(speed);
-              },
-              itemBuilder: (context) => [
+                  CheckedPopupMenuItem(
+                    value: 'quality_$q',
+                    checked: (_activeQuality ?? quality) == q,
+                    child: Text(q),
+                  ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'speed',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.speed_outlined, size: 20),
+                      const SizedBox(width: 12),
+                      Text('Speed: ${settings.playbackSpeed}x'),
+                    ],
+                  ),
+                ),
                 for (final s in const [
                   0.25,
                   0.5,
@@ -698,46 +711,60 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
                   1.75,
                   2.0,
                 ])
-                  PopupMenuItem(
-                    value: s,
-                    child: Text(
-                      s == 1.0 ? 'Normal' : '${s}x',
-                      style: TextStyle(
-                        fontWeight: settings.playbackSpeed == s
-                            ? FontWeight.w700
-                            : null,
-                      ),
-                    ),
+                  CheckedPopupMenuItem(
+                    value: 'speed_$s',
+                    checked: settings.playbackSpeed == s,
+                    child: Text(s == 1.0 ? 'Normal' : '${s}x'),
                   ),
+                const PopupMenuDivider(),
+                CheckedPopupMenuItem(
+                  value: 'theater',
+                  checked: theaterMode,
+                  child: Text(
+                    theaterMode ? 'Exit theater mode' : 'Theater mode',
+                  ),
+                ),
+                CheckedPopupMenuItem(
+                  value: 'chat',
+                  checked: showChat,
+                  child: Text(showChat ? 'Hide chat' : 'Show chat'),
+                ),
+                PopupMenuItem(
+                  value: 'layout',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.dashboard_customize_outlined, size: 20),
+                      const SizedBox(width: 12),
+                      const Text('Layout profile'),
+                    ],
+                  ),
+                ),
               ],
-              icon: const Icon(Icons.speed_outlined),
-            ),
-            IconButton(
-              tooltip: 'Layout profile',
-              onPressed: _openLayoutSheet,
-              icon: const Icon(Icons.dashboard_customize_outlined),
-            ),
-            IconButton(
-              tooltip: theaterMode ? 'Exit theater mode' : 'Theater mode',
-              onPressed: () {
-                _saveProfile(profile.copyWith(theaterMode: !theaterMode));
+              onSelected: (value) async {
+                if (value == 'layout') {
+                  _openLayoutSheet();
+                } else if (value == 'theater') {
+                  _saveProfile(profile.copyWith(theaterMode: !theaterMode));
+                } else if (value == 'chat') {
+                  final next = showChat
+                      ? ChatPlacement.hidden
+                      : (isLandscape
+                            ? ChatPlacement.side
+                            : ChatPlacement.bottom);
+                  await _saveProfile(profile.copyWith(chatPlacement: next));
+                  setState(() {});
+                } else if (value.startsWith('quality_')) {
+                  final q = value.substring('quality_'.length);
+                  await _setQuality(q);
+                } else if (value.startsWith('speed_')) {
+                  final s = double.parse(value.substring('speed_'.length));
+                  await ref
+                      .read(settingsControllerProvider.notifier)
+                      .setPlaybackSpeed(s);
+                  await _nativeKey.currentState?.setPlaybackSpeed(s);
+                  await _embedKey.currentState?.setPlaybackSpeed(s);
+                }
               },
-              icon: Icon(
-                theaterMode ? Icons.theaters : Icons.theaters_outlined,
-              ),
-            ),
-            IconButton(
-              tooltip: showChat ? 'Hide chat' : 'Show chat',
-              onPressed: () async {
-                final next = showChat
-                    ? ChatPlacement.hidden
-                    : (isLandscape ? ChatPlacement.side : ChatPlacement.bottom);
-                await _saveProfile(profile.copyWith(chatPlacement: next));
-                setState(() {});
-              },
-              icon: Icon(
-                showChat ? Icons.chat_bubble : Icons.chat_bubble_outline,
-              ),
             ),
           ],
         ),

@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nice_tv/core/env/app_env.dart';
+import 'package:nice_tv/core/network/dio_providers.dart';
+import 'package:nice_tv/features/auth/data/auth_repository.dart';
 
 class TwitchGqlClient {
   TwitchGqlClient({required this.dio});
@@ -80,14 +83,22 @@ class TwitchGqlClient {
 }
 
 final twitchGqlClientProvider = Provider<TwitchGqlClient>((ref) {
+  final base = ref.watch(dioProvider);
+  final auth = ref.watch(authRepositoryProvider);
   final dio = Dio(
-    BaseOptions(
+    base.options.copyWith(
       baseUrl: 'https://gql.twitch.tv',
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 20),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
+    ),
+  );
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final token = await auth.resolveAccessToken();
+        options.headers['Client-ID'] = AppEnv.clientId;
+        options.headers['Authorization'] = 'OAuth $token';
+        handler.next(options);
       },
     ),
   );

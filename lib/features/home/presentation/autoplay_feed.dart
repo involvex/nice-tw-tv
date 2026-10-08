@@ -88,6 +88,25 @@ class _AutoplayPage extends ConsumerStatefulWidget {
 class _AutoplayPageState extends ConsumerState<_AutoplayPage> {
   final _playerKey = GlobalKey<TwitchEmbedPlayerState>();
 
+  @override
+  void didUpdateWidget(covariant _AutoplayPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Stop player when page becomes inactive
+    if (oldWidget.active && !widget.active) {
+      _playerKey.currentState?.pause();
+    }
+    // Sync player mute state when global mute state changes
+    // Defer to avoid "Tried to modify a provider while the widget tree was building"
+    if (oldWidget.initialMuted != widget.initialMuted) {
+      final muted = widget.initialMuted;
+      Future.microtask(() {
+        if (mounted) {
+          _playerKey.currentState?.setMuted(muted);
+        }
+      });
+    }
+  }
+
   Future<void> _toggleMute() async {
     final settings = ref.read(settingsControllerProvider);
     final nextMuted = !settings.videoMuted;
@@ -150,9 +169,13 @@ class _AutoplayPageState extends ConsumerState<_AutoplayPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
-                onTap: () => context.push(
-                  '/profile/${widget.stream.userLogin}?userId=${widget.stream.userId}',
-                ),
+                onTap: () {
+                  final uri = Uri(
+                    path: '/profile/${widget.stream.userLogin}',
+                    queryParameters: {'userId': widget.stream.userId},
+                  );
+                  context.push(uri.toString());
+                },
                 child: Text(
                   widget.stream.userName,
                   style: theme.textTheme.titleLarge?.copyWith(
