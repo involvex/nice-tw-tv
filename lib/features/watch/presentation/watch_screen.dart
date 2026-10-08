@@ -43,13 +43,15 @@ class WatchScreen extends ConsumerStatefulWidget {
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
 }
 
-class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
+class _WatchScreenState extends ConsumerState<WatchScreen>
+    with RouteAware, WidgetsBindingObserver {
   final _embedKey = GlobalKey<TwitchEmbedPlayerState>();
   final _nativeKey = GlobalKey<NativeHlsPlayerState>();
   var _qualities = <String>['auto'];
   String? _activeQuality;
   var _pipSupported = false;
   var _forceEmbedFallback = false;
+  var _inPipMode = false;
   Timer? _historyTimer;
   Timer? _positionTimer;
   Duration? _resumePosition;
@@ -139,6 +141,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // When opened from PiP tap, hide UI after a few seconds of inactivity.
     if (widget.fromPip) {
       _uiHideTimer = Timer(const Duration(seconds: 3), () {
@@ -165,11 +168,32 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     routeObserver.unsubscribe(this);
     _historyTimer?.cancel();
     _positionTimer?.cancel();
     _uiHideTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Detect PiP mode: screen height shrinks significantly (< 400dp).
+    if (!mounted) return;
+    final height = MediaQuery.of(context).size.height;
+    final inPip = height < 400;
+    if (inPip != _inPipMode) {
+      _inPipMode = inPip;
+      if (inPip) {
+        // Hide all UI in PiP mode to prevent overflow.
+        _uiHidden = true;
+        _uiHideTimer?.cancel();
+      } else {
+        // Restore UI when exiting PiP mode.
+        _uiHidden = false;
+      }
+      setState(() {});
+    }
   }
 
   Future<void> _saveVodMetadata() async {

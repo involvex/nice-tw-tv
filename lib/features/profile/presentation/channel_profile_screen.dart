@@ -137,6 +137,8 @@ class ChannelProfileScreen extends ConsumerWidget {
                                   user.displayName,
                                   style: theme.textTheme.headlineSmall
                                       ?.copyWith(fontWeight: FontWeight.w800),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(
                                   '@${user.login}',
@@ -156,6 +158,7 @@ class ChannelProfileScreen extends ConsumerWidget {
                                         followState.value?.isLoading ?? false;
 
                                     return Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         FilledButton.icon(
                                           onPressed: isLoading
