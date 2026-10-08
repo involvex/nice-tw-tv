@@ -69,6 +69,7 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
     if (oldWidget.channelLogin != widget.channelLogin ||
         oldWidget.vodId != widget.vodId) {
       _failureReported = false;
+      // ignore: discarded_futures
       _open();
     }
   }
@@ -182,6 +183,10 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
 
   @override
   void dispose() {
+    // Pause the player before disposal to prevent audio leakage,
+    // especially when the player is shared (externalPlayer != null).
+    // ignore: discarded_futures
+    _player.pause();
     if (widget.externalPlayer == null) {
       _player.dispose();
     }

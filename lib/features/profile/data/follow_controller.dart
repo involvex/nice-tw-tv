@@ -39,10 +39,7 @@ class FollowController extends AsyncNotifier<FollowState> {
 
   Future<void> toggle() async {
     final auth = ref.read(authControllerProvider).value;
-    if (auth == null ||
-        !auth.isLoggedIn ||
-        auth.userId == null ||
-        auth.accessToken == null) {
+    if (auth == null || !auth.isLoggedIn || auth.userId == null) {
       throw const SignInRequiredException();
     }
     final current = state.value;
@@ -54,15 +51,9 @@ class FollowController extends AsyncNotifier<FollowState> {
     try {
       final gql = ref.read(twitchGqlClientProvider);
       if (current.isFollowing) {
-        await gql.unfollowUser(
-          accessToken: auth.accessToken!,
-          targetId: broadcasterId,
-        );
+        await gql.unfollowUser(targetId: broadcasterId);
       } else {
-        await gql.followUser(
-          accessToken: auth.accessToken!,
-          targetId: broadcasterId,
-        );
+        await gql.followUser(targetId: broadcasterId);
       }
       state = AsyncData(
         FollowState(isFollowing: !current.isFollowing, isLoading: false),

@@ -33,6 +33,7 @@ class MiniPlayer extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         final params = <String, String>{
+          'fromPip': 'true',
           if (stream.title != null && stream.title!.isNotEmpty)
             'title': stream.title!,
           if (stream.broadcasterId != null && stream.broadcasterId!.isNotEmpty)

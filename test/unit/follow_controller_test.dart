@@ -36,19 +36,13 @@ class FakeTwitchGqlClient implements TwitchGqlClient {
   bool shouldThrow = false;
 
   @override
-  Future<void> followUser({
-    required String accessToken,
-    required String targetId,
-  }) async {
+  Future<void> followUser({required String targetId}) async {
     if (shouldThrow) throw Exception('follow failed');
     calls.add('follow');
   }
 
   @override
-  Future<void> unfollowUser({
-    required String accessToken,
-    required String targetId,
-  }) async {
+  Future<void> unfollowUser({required String targetId}) async {
     if (shouldThrow) throw Exception('unfollow failed');
     calls.add('unfollow');
   }

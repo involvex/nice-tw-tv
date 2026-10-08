@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:nice_tv/core/env/app_env.dart';
 import 'package:nice_tv/core/network/dio_providers.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 
@@ -9,14 +8,11 @@ class TwitchGqlClient {
 
   final Dio dio;
 
+  /// Twitch's public web client ID used for GQL (Apollo) endpoint.
   static const webClientId = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
-  Future<void> followUser({
-    required String accessToken,
-    required String targetId,
-  }) {
+  Future<void> followUser({required String targetId}) {
     return _mutate(
-      accessToken: accessToken,
       operationName: 'FollowButton_FollowUser',
       query:
           'mutation FollowButton_FollowUser(\$input: FollowUserInput!) { '
@@ -27,12 +23,8 @@ class TwitchGqlClient {
     );
   }
 
-  Future<void> unfollowUser({
-    required String accessToken,
-    required String targetId,
-  }) {
+  Future<void> unfollowUser({required String targetId}) {
     return _mutate(
-      accessToken: accessToken,
       operationName: 'FollowButton_UnfollowUser',
       query:
           'mutation FollowButton_UnfollowUser(\$input: UnfollowUserInput!) { '
@@ -44,7 +36,6 @@ class TwitchGqlClient {
   }
 
   Future<void> _mutate({
-    required String accessToken,
     required String operationName,
     required String query,
     required Map<String, dynamic> variables,
@@ -56,12 +47,6 @@ class TwitchGqlClient {
         'query': query,
         'variables': variables,
       },
-      options: Options(
-        headers: {
-          'Client-Id': webClientId,
-          'Authorization': 'OAuth $accessToken',
-        },
-      ),
     );
     final errors = response.data?['errors'] as List<dynamic>?;
     if (errors != null && errors.isNotEmpty) {
@@ -96,7 +81,7 @@ final twitchGqlClientProvider = Provider<TwitchGqlClient>((ref) {
     InterceptorsWrapper(
       onRequest: (options, handler) async {
         final token = await auth.resolveAccessToken();
-        options.headers['Client-ID'] = AppEnv.clientId;
+        options.headers['Client-ID'] = TwitchGqlClient.webClientId;
         options.headers['Authorization'] = 'OAuth $token';
         handler.next(options);
       },

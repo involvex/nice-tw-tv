@@ -105,10 +105,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final login = state.pathParameters['login']!;
           final title = state.uri.queryParameters['title'];
           final userId = state.uri.queryParameters['userId'];
+          final fromPip = state.uri.queryParameters['fromPip'] == 'true';
           return WatchScreen(
             channelLogin: login,
             title: title,
             broadcasterId: userId,
+            fromPip: fromPip,
           );
         },
       ),
@@ -119,12 +121,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final title = state.uri.queryParameters['title'];
           final login = state.uri.queryParameters['login'] ?? 'vod';
           final userId = state.uri.queryParameters['userId'];
+          final fromPip = state.uri.queryParameters['fromPip'] == 'true';
           return WatchScreen(
             channelLogin: login,
             title: title,
             broadcasterId: userId,
             vodId: id,
             thumbnailUrl: state.uri.queryParameters['thumbnailUrl'],
+            fromPip: fromPip,
           );
         },
       ),
@@ -134,7 +138,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           final title = state.uri.queryParameters['title'];
           final login = state.uri.queryParameters['login'] ?? 'clip';
-          return WatchScreen(channelLogin: login, title: title, clipId: id);
+          final fromPip = state.uri.queryParameters['fromPip'] == 'true';
+          return WatchScreen(
+            channelLogin: login,
+            title: title,
+            clipId: id,
+            fromPip: fromPip,
+          );
         },
       ),
     ],

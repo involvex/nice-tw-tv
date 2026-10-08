@@ -28,6 +28,7 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.vodId,
     this.clipId,
     this.thumbnailUrl,
+    this.fromPip = false,
   });
 
   final String channelLogin;
@@ -36,6 +37,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   final String? vodId;
   final String? clipId;
   final String? thumbnailUrl;
+  final bool fromPip;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -53,6 +55,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
   Duration? _resumePosition;
   bool _miniplayerCollapsed = false;
   bool _routeSubscribed = false;
+  bool _uiHidden = false;
+  Timer? _uiHideTimer;
 
   @override
   void didChangeDependencies() {
@@ -135,6 +139,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    // When opened from PiP tap, hide UI after a few seconds of inactivity.
+    if (widget.fromPip) {
+      _uiHideTimer = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _uiHidden = true);
+      });
+    }
     // ignore: discarded_futures
     PipService.isSupported().then((value) {
       if (mounted) setState(() => _pipSupported = value);
@@ -158,6 +168,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
     routeObserver.unsubscribe(this);
     _historyTimer?.cancel();
     _positionTimer?.cancel();
+    _uiHideTimer?.cancel();
     super.dispose();
   }
 
@@ -550,6 +561,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
       densityOverride: profile.chatDensity,
     );
 
+    // When opened from PiP tap, start with UI hidden for clean viewing.
+    if (widget.fromPip && !_uiHidden) {
+      _uiHidden = true;
+    }
+
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -558,241 +574,286 @@ class _WatchScreenState extends ConsumerState<WatchScreen> with RouteAware {
         );
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.clipId != null
-                    ? 'Clip'
-                    : widget.vodId != null
-                    ? 'VOD'
-                    : widget.channelLogin,
-              ),
-              if (widget.title != null)
-                Text(
-                  widget.title!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
-                ),
-            ],
-          ),
-          actions: [
-            if (widget.broadcasterId != null)
-              Consumer(
-                builder: (context, ref, _) {
-                  final followState = ref.watch(
-                    followControllerProvider(widget.broadcasterId!),
-                  );
-                  final isFollowing = followState.value?.isFollowing ?? false;
-                  final isLoading = followState.value?.isLoading ?? false;
-                  return IconButton(
-                    tooltip: isFollowing ? 'Unfollow' : 'Follow',
-                    onPressed: isLoading
-                        ? null
-                        : () async {
-                            try {
-                              await ref
-                                  .read(
-                                    followControllerProvider(
-                                      widget.broadcasterId!,
-                                    ).notifier,
-                                  )
-                                  .toggle();
-                            } on SignInRequiredException {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Sign in to follow channels',
-                                  ),
-                                  action: SnackBarAction(
-                                    label: 'Sign in',
-                                    onPressed: () => context.push('/login'),
-                                  ),
-                                ),
-                              );
-                            } on Object catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Failed to update follow: $e',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                    icon: Icon(
-                      isFollowing ? Icons.favorite : Icons.favorite_border,
-                      color: isFollowing ? Colors.red : null,
+        appBar: _uiHidden
+            ? null
+            : AppBar(
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.clipId != null
+                          ? 'Clip'
+                          : widget.vodId != null
+                          ? 'VOD'
+                          : widget.channelLogin,
                     ),
-                  );
-                },
-              ),
-            IconButton(
-              tooltip: 'View profile',
-              onPressed: () => context.push(
-                '/profile/${widget.channelLogin}?userId=${widget.broadcasterId}',
-              ),
-              icon: const Icon(Icons.person_outline),
-            ),
-            IconButton(
-              tooltip: settings.videoMuted ? 'Unmute' : 'Mute',
-              onPressed: _toggleMute,
-              icon: Icon(
-                settings.videoMuted
-                    ? Icons.volume_off_outlined
-                    : Icons.volume_up_outlined,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Share',
-              onPressed: () {
-                String url;
-                if (widget.clipId != null && widget.clipId!.isNotEmpty) {
-                  url = 'https://clips.twitch.tv/${widget.clipId}';
-                } else if (widget.vodId != null && widget.vodId!.isNotEmpty) {
-                  url = 'https://www.twitch.tv/videos/${widget.vodId}';
-                } else {
-                  url = 'https://www.twitch.tv/${widget.channelLogin}';
-                }
-                SharePlus.instance.share(ShareParams(text: url));
-              },
-              icon: const Icon(Icons.share_outlined),
-            ),
-            if (_pipSupported)
-              IconButton(
-                tooltip: 'Picture in picture',
-                onPressed: () => PipService.enter(),
-                icon: const Icon(Icons.picture_in_picture_alt_outlined),
-              ),
-            PopupMenuButton<String>(
-              tooltip: 'More options',
-              icon: const Icon(Icons.more_vert),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'quality',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.high_quality_outlined, size: 20),
-                      const SizedBox(width: 12),
-                      Text(_activeQuality ?? quality),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                for (final q in _qualities)
-                  CheckedPopupMenuItem(
-                    value: 'quality_$q',
-                    checked: (_activeQuality ?? quality) == q,
-                    child: Text(q),
-                  ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: 'speed',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.speed_outlined, size: 20),
-                      const SizedBox(width: 12),
-                      Text('Speed: ${settings.playbackSpeed}x'),
-                    ],
-                  ),
-                ),
-                for (final s in const [
-                  0.25,
-                  0.5,
-                  0.75,
-                  1.0,
-                  1.25,
-                  1.5,
-                  1.75,
-                  2.0,
-                ])
-                  CheckedPopupMenuItem(
-                    value: 'speed_$s',
-                    checked: settings.playbackSpeed == s,
-                    child: Text(s == 1.0 ? 'Normal' : '${s}x'),
-                  ),
-                const PopupMenuDivider(),
-                CheckedPopupMenuItem(
-                  value: 'theater',
-                  checked: theaterMode,
-                  child: Text(
-                    theaterMode ? 'Exit theater mode' : 'Theater mode',
-                  ),
-                ),
-                CheckedPopupMenuItem(
-                  value: 'chat',
-                  checked: showChat,
-                  child: Text(showChat ? 'Hide chat' : 'Show chat'),
-                ),
-                PopupMenuItem(
-                  value: 'layout',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.dashboard_customize_outlined, size: 20),
-                      const SizedBox(width: 12),
-                      const Text('Layout profile'),
-                    ],
-                  ),
-                ),
-              ],
-              onSelected: (value) async {
-                if (value == 'layout') {
-                  _openLayoutSheet();
-                } else if (value == 'theater') {
-                  _saveProfile(profile.copyWith(theaterMode: !theaterMode));
-                } else if (value == 'chat') {
-                  final next = showChat
-                      ? ChatPlacement.hidden
-                      : (isLandscape
-                            ? ChatPlacement.side
-                            : ChatPlacement.bottom);
-                  await _saveProfile(profile.copyWith(chatPlacement: next));
-                  setState(() {});
-                } else if (value.startsWith('quality_')) {
-                  final q = value.substring('quality_'.length);
-                  await _setQuality(q);
-                } else if (value.startsWith('speed_')) {
-                  final s = double.parse(value.substring('speed_'.length));
-                  await ref
-                      .read(settingsControllerProvider.notifier)
-                      .setPlaybackSpeed(s);
-                  await _nativeKey.currentState?.setPlaybackSpeed(s);
-                  await _embedKey.currentState?.setPlaybackSpeed(s);
-                }
-              },
-            ),
-          ],
-        ),
-        body: theaterMode
-            ? Column(children: [Expanded(child: player)])
-            : forceSide && showChat
-            ? Row(
-                children: [
-                  Expanded(flex: videoFlex, child: player),
-                  Expanded(
-                    flex: chatFlex,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: theme.dividerColor),
+                    if (widget.title != null)
+                      Text(
+                        widget.title!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    if (_pipSupported)
+                      PopupMenuItem(
+                        value: 'pip',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.picture_in_picture_outlined,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Picture in picture'),
+                          ],
                         ),
                       ),
-                      child: chat,
+                  ],
+                ),
+                actions: [
+                  if (widget.broadcasterId != null)
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final followState = ref.watch(
+                          followControllerProvider(widget.broadcasterId!),
+                        );
+                        final isFollowing =
+                            followState.value?.isFollowing ?? false;
+                        final isLoading = followState.value?.isLoading ?? false;
+                        return IconButton(
+                          tooltip: isFollowing ? 'Unfollow' : 'Follow',
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  try {
+                                    await ref
+                                        .read(
+                                          followControllerProvider(
+                                            widget.broadcasterId!,
+                                          ).notifier,
+                                        )
+                                        .toggle();
+                                  } on SignInRequiredException {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: const Text(
+                                          'Sign in to follow channels',
+                                        ),
+                                        action: SnackBarAction(
+                                          label: 'Sign in',
+                                          onPressed: () =>
+                                              context.push('/login'),
+                                        ),
+                                      ),
+                                    );
+                                  } on Object catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Failed to update follow: $e',
+                                              ),
+                                            ),
+                                          );
+                                    }
+                                  }
+                                },
+                          icon: Icon(
+                            isFollowing
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: isFollowing ? Colors.red : null,
+                          ),
+                        );
+                      },
+                    ),
+                  IconButton(
+                    tooltip: 'View profile',
+                    onPressed: () => context.push(
+                      '/profile/${widget.channelLogin}?userId=${widget.broadcasterId}',
+                    ),
+                    icon: const Icon(Icons.person_outline),
+                  ),
+                  IconButton(
+                    tooltip: settings.videoMuted ? 'Unmute' : 'Mute',
+                    onPressed: _toggleMute,
+                    icon: Icon(
+                      settings.videoMuted
+                          ? Icons.volume_off_outlined
+                          : Icons.volume_up_outlined,
                     ),
                   ),
-                ],
-              )
-            : Column(
-                children: [
-                  player,
-                  if (showChat) Expanded(child: chat),
+                  IconButton(
+                    tooltip: 'Share',
+                    onPressed: () {
+                      String url;
+                      if (widget.clipId != null && widget.clipId!.isNotEmpty) {
+                        url = 'https://clips.twitch.tv/${widget.clipId}';
+                      } else if (widget.vodId != null &&
+                          widget.vodId!.isNotEmpty) {
+                        url = 'https://www.twitch.tv/videos/${widget.vodId}';
+                      } else {
+                        url = 'https://www.twitch.tv/${widget.channelLogin}';
+                      }
+                      SharePlus.instance.share(ShareParams(text: url));
+                    },
+                    icon: const Icon(Icons.share_outlined),
+                  ),
+                  if (_pipSupported)
+                    IconButton(
+                      tooltip: 'Picture in picture',
+                      onPressed: () => PipService.enter(),
+                      icon: const Icon(Icons.picture_in_picture_alt_outlined),
+                    ),
+                  PopupMenuButton<String>(
+                    tooltip: 'More options',
+                    icon: const Icon(Icons.more_vert),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'quality',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.high_quality_outlined, size: 20),
+                            const SizedBox(width: 12),
+                            Text(_activeQuality ?? quality),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      for (final q in _qualities)
+                        CheckedPopupMenuItem(
+                          value: 'quality_$q',
+                          checked: (_activeQuality ?? quality) == q,
+                          child: Text(q),
+                        ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'speed',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.speed_outlined, size: 20),
+                            const SizedBox(width: 12),
+                            Text('Speed: ${settings.playbackSpeed}x'),
+                          ],
+                        ),
+                      ),
+                      for (final s in const [
+                        0.25,
+                        0.5,
+                        0.75,
+                        1.0,
+                        1.25,
+                        1.5,
+                        1.75,
+                        2.0,
+                      ])
+                        CheckedPopupMenuItem(
+                          value: 'speed_$s',
+                          checked: settings.playbackSpeed == s,
+                          child: Text(s == 1.0 ? 'Normal' : '${s}x'),
+                        ),
+                      const PopupMenuDivider(),
+                      CheckedPopupMenuItem(
+                        value: 'theater',
+                        checked: theaterMode,
+                        child: Text(
+                          theaterMode ? 'Exit theater mode' : 'Theater mode',
+                        ),
+                      ),
+                      CheckedPopupMenuItem(
+                        value: 'chat',
+                        checked: showChat,
+                        child: Text(showChat ? 'Hide chat' : 'Show chat'),
+                      ),
+                      PopupMenuItem(
+                        value: 'layout',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.dashboard_customize_outlined,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Layout profile'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onSelected: (value) async {
+                      if (value == 'layout') {
+                        _openLayoutSheet();
+                      } else if (value == 'pip') {
+                        await PipService.enter();
+                      } else if (value == 'theater') {
+                        _saveProfile(
+                          profile.copyWith(theaterMode: !theaterMode),
+                        );
+                      } else if (value == 'chat') {
+                        final next = showChat
+                            ? ChatPlacement.hidden
+                            : (isLandscape
+                                  ? ChatPlacement.side
+                                  : ChatPlacement.bottom);
+                        await _saveProfile(
+                          profile.copyWith(chatPlacement: next),
+                        );
+                        setState(() {});
+                      } else if (value.startsWith('quality_')) {
+                        final q = value.substring('quality_'.length);
+                        await _setQuality(q);
+                      } else if (value.startsWith('speed_')) {
+                        final s = double.parse(
+                          value.substring('speed_'.length),
+                        );
+                        await ref
+                            .read(settingsControllerProvider.notifier)
+                            .setPlaybackSpeed(s);
+                        await _nativeKey.currentState?.setPlaybackSpeed(s);
+                        await _embedKey.currentState?.setPlaybackSpeed(s);
+                      }
+                    },
+                  ),
                 ],
               ),
+        body: _uiHidden
+            ? GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _uiHidden = false);
+                  _uiHideTimer?.cancel();
+                  _uiHideTimer = Timer(const Duration(seconds: 3), () {
+                    if (mounted) setState(() => _uiHidden = true);
+                  });
+                },
+                child: Center(child: player),
+              )
+            : (theaterMode
+                  ? Column(children: [Expanded(child: player)])
+                  : forceSide && showChat
+                  ? Row(
+                      children: [
+                        Expanded(flex: videoFlex, child: player),
+                        Expanded(
+                          flex: chatFlex,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                left: BorderSide(color: theme.dividerColor),
+                              ),
+                            ),
+                            child: chat,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        player,
+                        if (showChat) Expanded(child: chat),
+                      ],
+                    )),
       ),
     );
   }
