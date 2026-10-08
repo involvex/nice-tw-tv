@@ -52,6 +52,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   var _pipSupported = false;
   var _forceEmbedFallback = false;
   var _inPipMode = false;
+  static const _pipHeightThreshold = 400.0;
   Timer? _historyTimer;
   Timer? _positionTimer;
   Duration? _resumePosition;
@@ -146,9 +147,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     // Tap anywhere to reveal; UI auto-hides after 3s of inactivity.
     if (widget.fromPip) {
       _uiHidden = true;
-      _uiHideTimer = Timer(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _uiHidden = true);
-      });
     }
     // ignore: discarded_futures
     PipService.isSupported().then((value) {
@@ -183,7 +181,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     // Detect PiP mode: screen height shrinks significantly (< 400dp).
     if (!mounted) return;
     final height = MediaQuery.of(context).size.height;
-    final inPip = height < 400;
+    final inPip = height < _pipHeightThreshold;
     if (inPip != _inPipMode) {
       _inPipMode = inPip;
       if (inPip) {
