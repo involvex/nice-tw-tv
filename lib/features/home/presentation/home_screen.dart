@@ -295,14 +295,16 @@ class _CategoryChips extends ConsumerWidget {
     final selected = ref.watch(homeCategoryFilterProvider);
 
     return categories.when(
+      // Height 60 fits the 36dp chips + vertical list padding (10+6);
+      // 52dp clipped them and threw a ~6px bottom overflow.
       loading: () => const SizedBox(
-        height: 52,
+        height: 60,
         child: Center(child: LinearProgressIndicator()),
       ),
       error: (_, _) => const SizedBox(height: 8),
       data: (list) {
         return SizedBox(
-          height: 52,
+          height: 60,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
@@ -363,34 +365,38 @@ class _DiscoveryFilterBar extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      child: Row(
-        children: [
-          FilterChip(
-            label: Text(settings.discoveryLanguage?.toUpperCase() ?? 'LANG'),
-            onSelected: (_) => _openLanguageSheet(context, ref),
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: Text(
-              settings.discoveryHideMature ? 'Mature: off' : 'Mature: on',
+      // Scrollable so the three chips never overflow on narrow screens.
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            FilterChip(
+              label: Text(settings.discoveryLanguage?.toUpperCase() ?? 'LANG'),
+              onSelected: (_) => _openLanguageSheet(context, ref),
             ),
-            selected: settings.discoveryHideMature,
-            onSelected: (_) => ref
-                .read(settingsControllerProvider.notifier)
-                .setDiscoveryHideMature(!settings.discoveryHideMature),
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            avatar: const Icon(Icons.sort, size: 18),
-            label: Text(switch (settings.discoverySortOrder) {
-              'viewerCount' => 'Viewers',
-              'recentlyStarted' => 'Recent',
-              'alphabetical' => 'A-Z',
-              _ => 'Sort',
-            }),
-            onSelected: (_) => _openSortSheet(context, ref),
-          ),
-        ],
+            const SizedBox(width: 8),
+            FilterChip(
+              label: Text(
+                settings.discoveryHideMature ? 'Mature: off' : 'Mature: on',
+              ),
+              selected: settings.discoveryHideMature,
+              onSelected: (_) => ref
+                  .read(settingsControllerProvider.notifier)
+                  .setDiscoveryHideMature(!settings.discoveryHideMature),
+            ),
+            const SizedBox(width: 8),
+            FilterChip(
+              avatar: const Icon(Icons.sort, size: 18),
+              label: Text(switch (settings.discoverySortOrder) {
+                'viewerCount' => 'Viewers',
+                'recentlyStarted' => 'Recent',
+                'alphabetical' => 'A-Z',
+                _ => 'Sort',
+              }),
+              onSelected: (_) => _openSortSheet(context, ref),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -558,6 +564,7 @@ class StreamCard extends StatelessWidget {
         Row(
           children: [
             Flexible(
+              flex: 3,
               child: InkWell(
                 onTap: () => context.push(
                   '/profile/${stream.userLogin}?userId=${stream.userId}',
@@ -573,12 +580,17 @@ class StreamCard extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              ' · ${stream.gameName}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            // Second child must also be bounded — an unbounded Text next
+            // to Flexible overflows the Row on narrow screens / long names.
+            Flexible(
+              flex: 4,
+              child: Text(
+                stream.gameName.isEmpty ? '' : ' · ${stream.gameName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],

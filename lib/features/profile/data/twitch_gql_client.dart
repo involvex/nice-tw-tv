@@ -80,9 +80,14 @@ final twitchGqlClientProvider = Provider<TwitchGqlClient>((ref) {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await auth.resolveAccessToken();
+        // User token only — never substitute an app token with the OAuth
+        // prefix (the endpoint rejects it and the failure used to wipe
+        // the stored session). Callers pre-check via resolveUserToken.
+        final token = await auth.resolveUserToken();
         options.headers['Client-ID'] = TwitchGqlClient.webClientId;
-        options.headers['Authorization'] = 'OAuth $token';
+        if (token != null) {
+          options.headers['Authorization'] = 'OAuth $token';
+        }
         handler.next(options);
       },
     ),

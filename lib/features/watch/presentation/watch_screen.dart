@@ -52,7 +52,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   var _pipSupported = false;
   var _forceEmbedFallback = false;
   var _inPipMode = false;
-  static const _pipHeightThreshold = 400.0;
+  static const _pipHeightThreshold = 200.0;
+  static const _pipWidthThreshold = 500.0;
+  bool _fullscreenMode = false;
   Timer? _historyTimer;
   Timer? _positionTimer;
   Duration? _resumePosition;
@@ -87,16 +89,24 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   @override
   void didPushNext() {
-    _collapseToMiniplayer();
+    // RouteObserver callbacks fire during Navigator build/flush — never
+    // mutate providers synchronously here (throws "Tried to modify a
+    // provider while the widget tree was building").
+    Future.microtask(() {
+      if (mounted) _collapseToMiniplayer();
+    });
   }
 
   @override
   void didPop() {
-    _collapseToMiniplayer();
+    Future.microtask(() {
+      if (mounted) _collapseToMiniplayer();
+    });
   }
 
   Future<void> _collapseToMiniplayer() async {
     if (_miniplayerCollapsed) return;
+    if (!mounted) return;
     _miniplayerCollapsed = true;
     final isClip = widget.clipId != null;
     final profile = ref
@@ -114,6 +124,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     } else {
       position = await _embedKey.currentState?.getCurrentPosition();
     }
+    // The await above can land back inside a build/flush — re-check.
+    if (!mounted) return;
     ref
         .read(miniPlayerControllerProvider.notifier)
         .start(
@@ -178,22 +190,36 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
 
   @override
   void didChangeMetrics() {
-    // Detect PiP mode: screen height shrinks significantly (< 400dp).
     if (!mounted) return;
-    final height = MediaQuery.of(context).size.height;
-    final inPip = height < _pipHeightThreshold;
-    if (inPip != _inPipMode) {
-      _inPipMode = inPip;
-      if (inPip) {
-        // Hide all UI in PiP mode to prevent overflow.
-        _uiHidden = true;
-        _uiHideTimer?.cancel();
-      } else {
-        // Restore UI when exiting PiP mode.
-        _uiHidden = false;
+    final size = MediaQuery.of(context).size;
+    final height = size.height;
+    final width = size.width;
+    // Detect PiP mode: prefer platform-level detection. Fall back to a size
+    // heuristic that requires BOTH dimensions to be small — this prevents
+    // false positives in landscape mode where height is small but width is
+    // large.
+    PipService.isInPipMode().then((platformPip) {
+      if (!mounted) return;
+      final heightBasedPip =
+          height < _pipHeightThreshold && width < _pipWidthThreshold;
+      final inPip = platformPip || heightBasedPip;
+      if (inPip != _inPipMode) {
+        _inPipMode = inPip;
+        if (inPip) {
+          // Hide all UI in PiP mode to prevent overflow.
+          _uiHidden = true;
+          _uiHideTimer?.cancel();
+          _uiHideTimer = null;
+        } else {
+          // Restore UI when exiting PiP mode (unless user toggled
+          // fullscreen mode manually).
+          if (!_fullscreenMode) {
+            _uiHidden = false;
+          }
+        }
+        setState(() {});
       }
-      setState(() {});
-    }
+    });
   }
 
   Future<void> _saveVodMetadata() async {
@@ -593,7 +619,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
         );
       },
       child: Scaffold(
-        appBar: _uiHidden
+        appBar: _uiHidden || _fullscreenMode
             ? null
             : AppBar(
                 title: Column(
@@ -766,6 +792,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                         checked: showChat,
                         child: Text(showChat ? 'Hide chat' : 'Show chat'),
                       ),
+                      CheckedPopupMenuItem(
+                        value: 'fullscreen',
+                        checked: _fullscreenMode,
+                        child: Text(
+                          _fullscreenMode
+                              ? 'Exit fullscreen'
+                              : 'Enter fullscreen',
+                        ),
+                      ),
                       PopupMenuItem(
                         value: 'layout',
                         child: Row(
@@ -821,6 +856,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                           profile.copyWith(chatPlacement: next),
                         );
                         setState(() {});
+                      } else if (value == 'fullscreen') {
+                        setState(() {
+                          _fullscreenMode = !_fullscreenMode;
+                          if (!_fullscreenMode) {
+                            _uiHidden = false;
+                          }
+                        });
                       } else if (value.startsWith('quality_')) {
                         final q = value.substring('quality_'.length);
                         await _setQuality(q);
@@ -838,11 +880,14 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                   ),
                 ],
               ),
-        body: _uiHidden
+        body: _uiHidden || _fullscreenMode
             ? GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  setState(() => _uiHidden = false);
+                  setState(() {
+                    _uiHidden = false;
+                    _fullscreenMode = false;
+                  });
                   _uiHideTimer?.cancel();
                   _uiHideTimer = Timer(const Duration(seconds: 3), () {
                     if (mounted) setState(() => _uiHidden = true);

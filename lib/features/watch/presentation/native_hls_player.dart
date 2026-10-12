@@ -54,18 +54,23 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
 
   Player get player => _player;
   String get activeQuality => _activeQuality;
+  var _disposed = false;
+  var _openGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _player = widget.externalPlayer ?? Player();
     _controller = VideoController(_player);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_disposed) _open();
+    });
   }
 
   @override
   void didUpdateWidget(covariant NativeHlsPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (_disposed) return;
     if (oldWidget.channelLogin != widget.channelLogin ||
         oldWidget.vodId != widget.vodId) {
       _failureReported = false;
@@ -75,6 +80,8 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   }
 
   Future<void> _open() async {
+    if (_disposed || !mounted) return;
+    final generation = ++_openGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -105,7 +112,12 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
       _muted = widget.initialMuted;
       _unmuteVolume = widget.initialVolume;
       _playbackSpeed = widget.initialPlaybackSpeed;
+      // Bail if a newer open started or the widget was disposed while
+      // resolving the playlist — opening a disposed libmpv player
+      // segfaults (SIGSEGV in libmpv.so on Thread-9).
+      if (_disposed || !mounted || generation != _openGeneration) return;
       await _player.open(Media((target?.url ?? playlist.masterUrl).toString()));
+      if (_disposed || !mounted || generation != _openGeneration) return;
       await _player.setVolume(_muted ? 0 : _volume * 100);
       await _player.setRate(_playbackSpeed);
       final resume = widget.resumePosition;
@@ -183,11 +195,17 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
 
   @override
   void dispose() {
-    // Pause the player before disposal to prevent audio leakage,
-    // especially when the player is shared (externalPlayer != null).
+    // Flag first so any in-flight _open() bails before touching libmpv.
+    // Pause before disposal to prevent audio leakage, especially when
+    // the player is shared (externalPlayer != null). Only dispose the
+    // player we own — the shared mini-player instance is disposed by
+    // its provider's onDispose (double-dispose segfaults libmpv).
+    _disposed = true;
+    _openGeneration++;
     // ignore: discarded_futures
     _player.pause();
     if (widget.externalPlayer == null) {
+      // ignore: discarded_futures
       _player.dispose();
     }
     super.dispose();

@@ -23,13 +23,14 @@ class FollowController extends AsyncNotifier<FollowState> {
   @override
   Future<FollowState> build() async {
     final auth = ref.watch(authControllerProvider).value;
-    if (auth?.isLoggedIn != true || auth?.userId == null) {
+    final userId = auth?.userId;
+    if (auth?.isLoggedIn != true || userId == null) {
       return const FollowState(isFollowing: false, isLoading: false);
     }
     final helix = ref.read(helixRepositoryProvider);
     try {
       final isFollowing = await helix.isFollowingChannel(
-        userId: auth!.userId!,
+        userId: userId,
         broadcasterId: broadcasterId,
       );
       return FollowState(isFollowing: isFollowing, isLoading: false);
@@ -39,8 +40,23 @@ class FollowController extends AsyncNotifier<FollowState> {
   }
 
   Future<void> toggle() async {
-    final auth = ref.read(authControllerProvider).value;
-    if (auth == null || !auth.isLoggedIn || auth.userId == null) {
+    if (broadcasterId.isEmpty) {
+      throw StateError('broadcasterId is empty — cannot follow/unfollow');
+    }
+    final authRepo = ref.read(authRepositoryProvider);
+    // Require an actual stored user token — never let an app-token
+    // fallback reach the GQL endpoint (it rejects it, which previously
+    // triggered a logout that deleted the good stored token).
+    final userToken = await authRepo.resolveUserToken();
+    // The controller can briefly be AsyncLoading right after login while
+    // completeLogin validates the token — fall back to the repository
+    // session so a valid login isn't misreported as signed-out.
+    final controllerAuth = ref.read(authControllerProvider).value;
+    final repoSession = authRepo.session;
+    final isLoggedIn =
+        (controllerAuth?.isLoggedIn ?? false) || repoSession.isLoggedIn;
+    final userId = controllerAuth?.userId ?? repoSession.userId;
+    if (userToken == null || !isLoggedIn || userId == null) {
       throw const SignInRequiredException();
     }
     final current = state.value;
@@ -64,11 +80,22 @@ class FollowController extends AsyncNotifier<FollowState> {
       state = AsyncData(
         FollowState(isFollowing: current.isFollowing, isLoading: false),
       );
-      // If auth token is expired or invalid (401), log out so the
-      // UI can prompt the user to sign in again.
+      // An HTTP 401 alone does NOT prove the stored token is dead (it can
+      // come from a stale in-memory token or a request-level issue).
+      // Re-validate the stored token first and only wipe the session when
+      // it is provably invalid — otherwise a follow failure must surface
+      // as a follow error, never as a forced logout.
       if (e.response?.statusCode == 401) {
-        await ref.read(authRepositoryProvider).logout();
-        throw const SignInRequiredException();
+        final stored = await ref
+            .read(authRepositoryProvider)
+            .resolveUserToken();
+        final alive =
+            stored != null &&
+            await ref.read(authRepositoryProvider).isTokenValid(stored);
+        if (!alive) {
+          await ref.read(authControllerProvider.notifier).logout();
+          throw const SignInRequiredException();
+        }
       }
       rethrow;
     } on Object {
@@ -77,6 +104,30 @@ class FollowController extends AsyncNotifier<FollowState> {
       );
       rethrow;
     }
+  }
+
+  /// Returns `true` when a GraphQL response body carries an auth-related
+  /// error message. Used for diagnostics only — [toggle] deliberately only
+  /// auto-logs-out on HTTP 401 so a valid session is never wiped by a
+  /// non-auth GraphQL failure (unknown target, scope, etc.).
+  static bool isGraphQlAuthError(DioException e) {
+    final data = e.response?.data;
+    if (data is! Map<String, dynamic>) return false;
+    final errors = data['errors'] as List<dynamic>?;
+    if (errors == null || errors.isEmpty) return false;
+
+    for (final error in errors) {
+      if (error is! Map<String, dynamic>) continue;
+      final message = (error['message'] as String? ?? '').toLowerCase();
+      if (message.contains('unauthorized') ||
+          message.contains('invalid oauth') ||
+          message.contains('invalid access token') ||
+          message.contains('not authorized') ||
+          message.contains('invalid token')) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 

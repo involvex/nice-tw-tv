@@ -23,4 +23,14 @@ class PipService {
       return false;
     }
   }
+
+  /// Returns `true` when the app is currently in Picture-in-Picture mode.
+  /// Falls back to `false` on platforms/channels that don't implement it.
+  static Future<bool> isInPipMode() async {
+    try {
+      return await _channel.invokeMethod<bool>('isInPipMode') ?? false;
+    } on Object {
+      return false;
+    }
+  }
 }

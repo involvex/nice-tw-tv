@@ -65,8 +65,10 @@ class MiniPlayer extends ConsumerWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(8),
                 ),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
+                // NOTE: no AspectRatio here — Expanded already bounds height
+                // and AspectRatio inside Expanded caused
+                // "RenderBox was not laid out" crashes.
+                child: SizedBox.expand(
                   child: useNative
                       ? NativeHlsPlayer(
                           externalPlayer: externalPlayer,

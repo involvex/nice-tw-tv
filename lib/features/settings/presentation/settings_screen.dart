@@ -29,7 +29,9 @@ class SettingsScreen extends ConsumerWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.account_circle_outlined),
-              title: Text(auth!.login ?? 'Signed in'),
+              title: Text(
+                (auth?.login?.isNotEmpty ?? false) ? auth!.login! : 'Signed in',
+              ),
               subtitle: const Text('Twitch account connected'),
               trailing: TextButton(
                 onPressed: () =>
@@ -152,39 +154,52 @@ class SettingsScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: const Text('Chat font size scale'),
             subtitle: const Text('Scale factor for chat message text size'),
-            trailing: Slider(
-              value: settings.chatFontSizeScale,
-              min: 0.5,
-              max: 2.0,
-              divisions: 15,
-              label: settings.chatFontSizeScale.roundToDouble().toStringAsFixed(
-                1,
+            // Constrain trailing width — an unbounded Slider/Dropdown in
+            // ListTile.trailing throws "Trailing widget consumes the entire
+            // tile width" and cascades into RenderBox not-laid-out crashes.
+            trailing: SizedBox(
+              width: 160,
+              child: Slider(
+                value: settings.chatFontSizeScale,
+                min: 0.5,
+                max: 2.0,
+                divisions: 15,
+                label: settings.chatFontSizeScale
+                    .roundToDouble()
+                    .toStringAsFixed(1),
+                onChanged: (value) {
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .setChatFontSizeScale(value);
+                },
               ),
-              onChanged: (value) {
-                ref
-                    .read(settingsControllerProvider.notifier)
-                    .setChatFontSizeScale(value);
-              },
             ),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Chat font family'),
             subtitle: const Text('Font family for chat messages'),
-            trailing: DropdownButton<String>(
-              value: settings.chatFontFamily,
-              items: const [
-                DropdownMenuItem(value: 'Segoe UI', child: Text('Segoe UI')),
-                DropdownMenuItem(value: 'Roboto', child: Text('Roboto')),
-                DropdownMenuItem(value: 'Noto Sans', child: Text('Noto Sans')),
-                DropdownMenuItem(value: 'System', child: Text('System')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                ref
-                    .read(settingsControllerProvider.notifier)
-                    .setChatFontFamily(value);
-              },
+            trailing: SizedBox(
+              width: 140,
+              child: DropdownButton<String>(
+                value: settings.chatFontFamily,
+                isExpanded: true,
+                items: const [
+                  DropdownMenuItem(value: 'Segoe UI', child: Text('Segoe UI')),
+                  DropdownMenuItem(value: 'Roboto', child: Text('Roboto')),
+                  DropdownMenuItem(
+                    value: 'Noto Sans',
+                    child: Text('Noto Sans'),
+                  ),
+                  DropdownMenuItem(value: 'System', child: Text('System')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .setChatFontFamily(value);
+                },
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -199,22 +214,26 @@ class SettingsScreen extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: const Text('Default quality'),
             subtitle: Text(settings.videoQuality),
-            trailing: DropdownButton<String>(
-              value: settings.videoQuality,
-              items: const [
-                DropdownMenuItem(value: 'auto', child: Text('Auto')),
-                DropdownMenuItem(value: '160p', child: Text('160p')),
-                DropdownMenuItem(value: '360p', child: Text('360p')),
-                DropdownMenuItem(value: '480p', child: Text('480p')),
-                DropdownMenuItem(value: '720p', child: Text('720p')),
-                DropdownMenuItem(value: '1080p', child: Text('1080p')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                ref
-                    .read(settingsControllerProvider.notifier)
-                    .setVideoQuality(value);
-              },
+            trailing: SizedBox(
+              width: 120,
+              child: DropdownButton<String>(
+                value: settings.videoQuality,
+                isExpanded: true,
+                items: const [
+                  DropdownMenuItem(value: 'auto', child: Text('Auto')),
+                  DropdownMenuItem(value: '160p', child: Text('160p')),
+                  DropdownMenuItem(value: '360p', child: Text('360p')),
+                  DropdownMenuItem(value: '480p', child: Text('480p')),
+                  DropdownMenuItem(value: '720p', child: Text('720p')),
+                  DropdownMenuItem(value: '1080p', child: Text('1080p')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .setVideoQuality(value);
+                },
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -226,27 +245,31 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Text(
               settings.discoveryLanguage?.toUpperCase() ?? 'All languages',
             ),
-            trailing: DropdownButton<String>(
-              value: settings.discoveryLanguage,
-              items: const [
-                DropdownMenuItem(value: null, child: Text('All')),
-                DropdownMenuItem(value: 'en', child: Text('English')),
-                DropdownMenuItem(value: 'de', child: Text('German')),
-                DropdownMenuItem(value: 'fr', child: Text('French')),
-                DropdownMenuItem(value: 'es', child: Text('Spanish')),
-                DropdownMenuItem(value: 'pt', child: Text('Portuguese')),
-                DropdownMenuItem(value: 'ko', child: Text('Korean')),
-                DropdownMenuItem(value: 'ja', child: Text('Japanese')),
-                DropdownMenuItem(value: 'zh', child: Text('Chinese')),
-                DropdownMenuItem(value: 'ru', child: Text('Russian')),
-                DropdownMenuItem(value: 'other', child: Text('Other')),
-              ],
-              onChanged: (value) {
-                if (value == settings.discoveryLanguage) return;
-                ref
-                    .read(settingsControllerProvider.notifier)
-                    .setDiscoveryLanguage(value);
-              },
+            trailing: SizedBox(
+              width: 140,
+              child: DropdownButton<String?>(
+                value: settings.discoveryLanguage,
+                isExpanded: true,
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('All')),
+                  DropdownMenuItem(value: 'en', child: Text('English')),
+                  DropdownMenuItem(value: 'de', child: Text('German')),
+                  DropdownMenuItem(value: 'fr', child: Text('French')),
+                  DropdownMenuItem(value: 'es', child: Text('Spanish')),
+                  DropdownMenuItem(value: 'pt', child: Text('Portuguese')),
+                  DropdownMenuItem(value: 'ko', child: Text('Korean')),
+                  DropdownMenuItem(value: 'ja', child: Text('Japanese')),
+                  DropdownMenuItem(value: 'zh', child: Text('Chinese')),
+                  DropdownMenuItem(value: 'ru', child: Text('Russian')),
+                  DropdownMenuItem(value: 'other', child: Text('Other')),
+                ],
+                onChanged: (value) {
+                  if (value == settings.discoveryLanguage) return;
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .setDiscoveryLanguage(value);
+                },
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -271,22 +294,29 @@ class SettingsScreen extends ConsumerWidget {
               'alphabetical' => 'Alphabetical (A-Z)',
               _ => settings.discoverySortOrder,
             }),
-            trailing: DropdownButton<String>(
-              value: settings.discoverySortOrder,
-              items: const [
-                DropdownMenuItem(value: 'viewerCount', child: Text('Viewers')),
-                DropdownMenuItem(
-                  value: 'recentlyStarted',
-                  child: Text('Recent'),
-                ),
-                DropdownMenuItem(value: 'alphabetical', child: Text('A-Z')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                ref
-                    .read(settingsControllerProvider.notifier)
-                    .setDiscoverySortOrder(value);
-              },
+            trailing: SizedBox(
+              width: 120,
+              child: DropdownButton<String>(
+                value: settings.discoverySortOrder,
+                isExpanded: true,
+                items: const [
+                  DropdownMenuItem(
+                    value: 'viewerCount',
+                    child: Text('Viewers'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'recentlyStarted',
+                    child: Text('Recent'),
+                  ),
+                  DropdownMenuItem(value: 'alphabetical', child: Text('A-Z')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .setDiscoverySortOrder(value);
+                },
+              ),
             ),
           ),
           const SizedBox(height: 24),

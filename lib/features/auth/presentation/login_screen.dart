@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +17,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final WebViewController _controller;
   var _loading = true;
   String? _error;
+  var _finished = false;
+  Timer? _fragmentPoll;
 
   @override
   void initState() {
@@ -48,10 +52,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       )
       ..loadRequest(Uri.parse(auth.buildAuthorizeUrl()));
+    // The implicit-grant token lands in the URL *fragment*
+    // (#access_token=...). Fragment-only changes don't trigger
+    // onNavigationRequest, and some WebView versions strip the fragment
+    // from onUrlChange — so poll window.location.href directly.
+    _fragmentPoll = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _pollLocationForToken(auth);
+    });
+  }
+
+  Future<void> _pollLocationForToken(AuthRepository auth) async {
+    if (_finished || !mounted) return;
+    try {
+      final href = await _controller.runJavaScriptReturningResult(
+        'window.location.href',
+      );
+      final url = href is String ? href : href.toString();
+      if (auth.isOAuthRedirect(url)) {
+        final token = auth.extractTokenFromRedirect(url);
+        if (token != null) _finish(token);
+      }
+    } on Object {
+      // WebView not ready yet — the next tick retries.
+    }
+  }
+
+  @override
+  void dispose() {
+    _fragmentPoll?.cancel();
+    super.dispose();
   }
 
   Future<void> _finish(String token) async {
-    await ref.read(authControllerProvider.notifier).completeLogin(token);
+    // onNavigationRequest + onUrlChange can both fire for the same
+    // redirect — only finish once.
+    if (_finished) return;
+    _finished = true;
+    _fragmentPoll?.cancel();
+    _fragmentPoll = null;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(authControllerProvider.notifier).completeLogin(token);
+    } on Object catch (e) {
+      _finished = false;
+      // Resume polling so a retry still captures the token.
+      _fragmentPoll?.cancel();
+      final auth = ref.read(authRepositoryProvider);
+      _fragmentPoll = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        _pollLocationForToken(auth);
+      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Sign-in failed: $e';
+        });
+      }
+      return;
+    }
     if (mounted) context.go('/');
   }
 

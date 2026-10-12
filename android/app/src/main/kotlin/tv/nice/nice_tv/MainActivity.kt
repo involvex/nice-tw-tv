@@ -37,6 +37,14 @@ class MainActivity : FlutterActivity() {
                                 .build()
                         result.success(enterPictureInPictureMode(params))
                     }
+                    "isInPipMode" -> {
+                        val inPip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            isInPictureInPictureMode()
+                        } else {
+                            false
+                        }
+                        result.success(inPip)
+                    }
                     else -> result.notImplemented()
                 }
             }

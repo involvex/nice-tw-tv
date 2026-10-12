@@ -26,8 +26,11 @@ class ContinueWatchingShelf extends ConsumerWidget {
             ),
           ),
         ),
+        // Card content: 16:9 thumb at 260dp wide (~146dp) + 8dp gap +
+        // title + username ≈ 194dp. A smaller box clips the text and
+        // throws a bottom overflow.
         SizedBox(
-          height: 180,
+          height: 210,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),

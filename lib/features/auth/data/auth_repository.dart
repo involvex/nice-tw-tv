@@ -45,9 +45,18 @@ class AuthRepository {
   }
 
   /// Parses `#access_token=...` from the OAuth redirect URL.
+  /// Uses a regex first: WebView URLs may carry the token in the fragment
+  /// (which `Uri.queryParameters` drops) or alongside an existing query.
   String? extractTokenFromRedirect(String url) {
-    final uri = Uri.parse(url.replaceFirst('#', '?'));
-    return uri.queryParameters['access_token'];
+    final match = RegExp('[#?&]access_token=([^&#]+)').firstMatch(url);
+    final token = match?.group(1);
+    if (token != null && token.isNotEmpty) return token;
+    try {
+      final uri = Uri.parse(url.replaceFirst('#', '?'));
+      return uri.queryParameters['access_token'];
+    } on FormatException {
+      return null;
+    }
   }
 
   bool isOAuthRedirect(String url) {
@@ -73,6 +82,24 @@ class AuthRepository {
         login: user.$1,
         userId: user.$2,
       );
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        // Token is truly dead — clear it.
+        await tokenStorage.clearUserSession();
+        _session = AuthSession.anonymous;
+      } else {
+        // Transient network/server error at startup — keep the stored
+        // session instead of logging the user out on every refresh.
+        final login = await tokenStorage.readLogin();
+        final userId = await tokenStorage.readUserId();
+        _session = AuthSession(
+          isLoggedIn: true,
+          accessToken: token,
+          login: (login?.isNotEmpty ?? false) ? login : null,
+          userId: (userId?.isNotEmpty ?? false) ? userId : null,
+        );
+      }
     } on Object {
       await tokenStorage.clearUserSession();
       _session = AuthSession.anonymous;
@@ -87,6 +114,13 @@ class AuthRepository {
       login: user.$1,
       userId: user.$2,
     );
+    // Verify persistence — on some devices secure storage writes can
+    // silently fail, which used to leave the UI "logged in" while nothing
+    // was stored (logged out again on next launch).
+    final persisted = await tokenStorage.readUserToken();
+    if (persisted == null || persisted.isEmpty) {
+      throw StateError('Could not persist session on this device');
+    }
     _session = AuthSession(
       isLoggedIn: true,
       accessToken: accessToken,
@@ -103,9 +137,35 @@ class AuthRepository {
 
   /// Prefer user token; fall back to app (client-credentials) token.
   Future<String> resolveAccessToken() async {
+    final user = await resolveUserToken();
+    if (user != null) return user;
+    return fetchAppToken();
+  }
+
+  /// User token only — no app-token fallback. Returns null when signed out.
+  /// User-scoped operations (follow/unfollow, GQL) must use this so a
+  /// missing user token is never silently replaced by an app token (which
+  /// the endpoint rejects, previously triggering bogus logouts).
+  Future<String?> resolveUserToken() async {
     final user = await tokenStorage.readUserToken();
     if (user != null && user.isNotEmpty) return user;
-    return fetchAppToken();
+    return null;
+  }
+
+  /// True when [token] validates against Twitch. Network/server errors
+  /// count as true (unknown) so callers never destroy a session they
+  /// cannot prove dead.
+  Future<bool> isTokenValid(String token) async {
+    try {
+      await _validateToken(token);
+      return true;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) return false;
+      return true;
+    } on Object {
+      return false;
+    }
   }
 
   Future<String> fetchAppToken() async {
