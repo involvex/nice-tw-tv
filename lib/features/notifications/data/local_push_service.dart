@@ -1,14 +1,19 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nice_tv/features/notifications/data/notification_deep_link.dart';
 import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
 
 /// Local OS notifications for live alerts (works without Firebase).
 /// Remote FCM delivery is handled by the token-proxy worker when configured.
 class LocalPushService {
-  LocalPushService();
+  LocalPushService({this.onNotificationTap});
+
+  /// Called when the user taps a notification (foreground or background).
+  final void Function(String? payload)? onNotificationTap;
 
   final _plugin = FlutterLocalNotificationsPlugin();
   var _ready = false;
+  var _launchDetailsConsumed = false;
 
   Future<void> init() async {
     if (_ready) return;
@@ -17,6 +22,7 @@ class LocalPushService {
       const ios = DarwinInitializationSettings();
       await _plugin.initialize(
         settings: const InitializationSettings(android: android, iOS: ios),
+        onDidReceiveNotificationResponse: _onResponse,
       );
       final androidPlugin = _plugin
           .resolvePlatformSpecificImplementation<
@@ -35,6 +41,25 @@ class LocalPushService {
     } on Object {
       // Missing plugin binding in tests / unsupported hosts.
       _ready = false;
+    }
+  }
+
+  void _onResponse(NotificationResponse response) {
+    onNotificationTap?.call(response.payload);
+  }
+
+  /// Returns the payload that launched the app from a killed state, once.
+  Future<String?> consumeLaunchPayload() async {
+    if (_launchDetailsConsumed) return null;
+    _launchDetailsConsumed = true;
+    try {
+      await init();
+      if (!_ready) return null;
+      final details = await _plugin.getNotificationAppLaunchDetails();
+      if (details?.didNotificationLaunchApp != true) return null;
+      return details?.notificationResponse?.payload;
+    } on Object {
+      return null;
     }
   }
 
@@ -66,5 +91,9 @@ class LocalPushService {
 }
 
 final localPushServiceProvider = Provider<LocalPushService>((ref) {
-  return LocalPushService();
+  return LocalPushService(
+    onNotificationTap: (payload) {
+      ref.read(notificationDeepLinkProvider.notifier).offerPayload(payload);
+    },
+  );
 });

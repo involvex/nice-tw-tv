@@ -32,13 +32,26 @@ class EventSubLiveClient {
   var _disposed = false;
   String? _sessionId;
 
+  String? _userId;
+  int _maxSubscriptions = 40;
+  Timer? _reconnectTimer;
+  var _backoffSeconds = 1;
+  static const _maxBackoffSeconds = 30;
+  var _intentionalStop = false;
+
   Stream<EventSubOnlineEvent> get onlineEvents => _controller.stream;
 
   Future<void> start({
     required String userId,
     int maxSubscriptions = 40,
   }) async {
-    await stop();
+    _userId = userId;
+    _maxSubscriptions = maxSubscriptions;
+    _intentionalStop = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    await _closeSocket();
+    _intentionalStop = false;
     if (_disposed) return;
 
     _channel = WebSocketChannel.connect(
@@ -46,8 +59,8 @@ class EventSubLiveClient {
     );
     _sub = _channel!.stream.listen(
       (data) => _onMessage(data, userId: userId, max: maxSubscriptions),
-      onError: (_) {},
-      onDone: () {},
+      onError: (_) => _scheduleReconnect(),
+      onDone: _scheduleReconnect,
       cancelOnError: true,
     );
   }
@@ -67,6 +80,7 @@ class EventSubLiveClient {
       if (messageType == 'session_welcome') {
         final session = payload['session'] as Map<String, dynamic>? ?? {};
         _sessionId = session['id'] as String?;
+        _backoffSeconds = 1;
         if (_sessionId != null) {
           await _subscribeFollowed(userId: userId, max: max);
         }
@@ -133,20 +147,39 @@ class EventSubLiveClient {
     required String userId,
     required int max,
   }) async {
+    _intentionalStop = true;
     await _sub?.cancel();
     try {
       await _channel?.sink.close();
     } on Object {
       // ignore
     }
+    _intentionalStop = false;
     _channel = WebSocketChannel.connect(Uri.parse(url));
     _sub = _channel!.stream.listen(
       (data) => _onMessage(data, userId: userId, max: max),
+      onError: (_) => _scheduleReconnect(),
+      onDone: _scheduleReconnect,
       cancelOnError: true,
     );
   }
 
-  Future<void> stop() async {
+  void _scheduleReconnect() {
+    if (_disposed || _intentionalStop) return;
+    final userId = _userId;
+    if (userId == null) return;
+    if (_reconnectTimer?.isActive == true) return;
+
+    final delay = Duration(seconds: _backoffSeconds);
+    _backoffSeconds = (_backoffSeconds * 2).clamp(1, _maxBackoffSeconds);
+    _reconnectTimer = Timer(delay, () {
+      if (_disposed || _intentionalStop) return;
+      // ignore: discarded_futures
+      start(userId: userId, maxSubscriptions: _maxSubscriptions);
+    });
+  }
+
+  Future<void> _closeSocket() async {
     await _sub?.cancel();
     _sub = null;
     try {
@@ -156,6 +189,13 @@ class EventSubLiveClient {
     }
     _channel = null;
     _sessionId = null;
+  }
+
+  Future<void> stop() async {
+    _intentionalStop = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    await _closeSocket();
   }
 
   Future<void> dispose() async {

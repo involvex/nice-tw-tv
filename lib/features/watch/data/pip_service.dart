@@ -16,6 +16,25 @@ class PipService {
     }
   }
 
+  /// Enables or disables automatic PiP when the user leaves the app
+  /// (Home / overview). Live Watch screens should enable this; clear on
+  /// dispose. On API 31+ this also sets [setAutoEnterEnabled].
+  static Future<void> setAutoEnter(
+    bool enabled, {
+    int width = 16,
+    int height = 9,
+  }) async {
+    try {
+      await _channel.invokeMethod<void>('setAutoEnter', {
+        'enabled': enabled,
+        'width': width,
+        'height': height,
+      });
+    } on Object {
+      // Unsupported host / tests.
+    }
+  }
+
   static Future<bool> isSupported() async {
     try {
       return await _channel.invokeMethod<bool>('isPipSupported') ?? false;

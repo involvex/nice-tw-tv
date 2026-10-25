@@ -92,13 +92,20 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     // RouteObserver callbacks fire during Navigator build/flush — never
     // mutate providers synchronously here (throws "Tried to modify a
     // provider while the widget tree was building").
+    _updateAutoPip(enabled: false);
     Future.microtask(() {
       if (mounted) _collapseToMiniplayer();
     });
   }
 
   @override
+  void didPopNext() {
+    _updateAutoPip(enabled: true);
+  }
+
+  @override
   void didPop() {
+    _updateAutoPip(enabled: false);
     Future.microtask(() {
       if (mounted) _collapseToMiniplayer();
     });
@@ -164,6 +171,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     PipService.isSupported().then((value) {
       if (mounted) setState(() => _pipSupported = value);
     });
+    _updateAutoPip(enabled: _isLiveWatch);
     if (widget.vodId != null) {
       SharedPreferences.getInstance().then((prefs) {
         final store = VodProgressStore(prefs);
@@ -178,8 +186,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     _schedulePositionSave();
   }
 
+  bool get _isLiveWatch => widget.vodId == null && widget.clipId == null;
+
+  void _updateAutoPip({required bool enabled}) {
+    if (!_isLiveWatch) {
+      // ignore: discarded_futures
+      PipService.setAutoEnter(false);
+      return;
+    }
+    // ignore: discarded_futures
+    PipService.setAutoEnter(enabled);
+  }
+
   @override
   void dispose() {
+    _updateAutoPip(enabled: false);
     WidgetsBinding.instance.removeObserver(this);
     routeObserver.unsubscribe(this);
     _historyTimer?.cancel();
@@ -834,13 +855,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                       if (value == 'layout') {
                         _openLayoutSheet();
                       } else if (value == 'pip') {
-                        // Pause the active player before entering PiP to
-                        // prevent native SurfaceControl crashes.
-                        if (useNative) {
-                          _nativeKey.currentState?.player.pause();
-                        } else {
-                          await _embedKey.currentState?.pause();
-                        }
+                        // Keep playback running so the PiP window is not
+                        // a frozen/paused frame.
                         await PipService.enter();
                       } else if (value == 'theater') {
                         _saveProfile(
