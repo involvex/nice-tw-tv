@@ -2,8 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/widgets/nice_empty_state.dart';
+import 'package:nice_tv/core/widgets/nice_error_pane.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
+import 'package:nice_tv/features/home/presentation/home_screen.dart';
 import 'package:nice_tv/features/vod/data/twitch_vod.dart';
+import 'package:nice_tv/features/watch/data/player_overlay_controller.dart';
+import 'package:nice_tv/features/watch/presentation/mini_player.dart';
 
 class VodFeedState {
   const VodFeedState({
@@ -64,6 +69,9 @@ class VodScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(vodFeedControllerProvider);
     final theme = Theme.of(context);
+    final listBottom = MiniPlayer.contentBottomPadding(
+      ref.watch(miniPlayerControllerProvider) != null,
+    );
 
     return Scaffold(
       body: RefreshIndicator(
@@ -95,28 +103,23 @@ class VodScreen extends ConsumerWidget {
               )
             else if (feed.error != null && feed.vods.isEmpty)
               SliverFillRemaining(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(feed.error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: () => ref
-                              .read(vodFeedControllerProvider.notifier)
-                              .refresh(),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
+                child: NiceErrorPane.fromError(
+                  error: feed.error!,
+                  onRetry: () =>
+                      ref.read(vodFeedControllerProvider.notifier).refresh(),
+                ),
+              )
+            else if (feed.vods.isEmpty)
+              const SliverFillRemaining(
+                child: NiceEmptyState(
+                  icon: Icons.video_library_outlined,
+                  title: 'No VODs right now',
+                  body: 'Archives from popular channels will show up here.',
                 ),
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, listBottom),
                 sliver: SliverList.separated(
                   itemCount: feed.vods.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 14),
@@ -191,7 +194,7 @@ class VodScreen extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            '${vod.userName} · ${vod.viewCount} views',
+                            '${vod.userName} · ${formatViewers(vod.viewCount)} views',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

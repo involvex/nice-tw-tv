@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/widgets/nice_error_pane.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -115,8 +116,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (mounted) context.go('/');
   }
 
+  void _retryAuthorize() {
+    final auth = ref.read(authRepositoryProvider);
+    setState(() {
+      _error = null;
+      _loading = true;
+      _finished = false;
+    });
+    _fragmentPoll?.cancel();
+    _fragmentPoll = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      _pollLocationForToken(auth);
+    });
+    _controller.loadRequest(Uri.parse(auth.buildAuthorizeUrl()));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign in with Twitch'),
@@ -130,11 +146,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           WebViewWidget(controller: _controller),
           if (_loading) const LinearProgressIndicator(),
           if (_error != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(_error!, textAlign: TextAlign.center),
-              ),
+            ColoredBox(
+              color: scheme.surface.withValues(alpha: 0.92),
+              child: NiceErrorPane(message: _error!, onRetry: _retryAuthorize),
             ),
         ],
       ),

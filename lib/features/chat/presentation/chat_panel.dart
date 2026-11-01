@@ -39,6 +39,10 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
   final _searchController = TextEditingController();
   var _searchQuery = '';
   var _searching = false;
+  var _pinnedToBottom = true;
+  var _unreadWhileScrolled = false;
+
+  static const _pinThreshold = 80.0;
 
   @override
   void initState() {
@@ -47,6 +51,7 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
       ref.read(chatControllerProvider.notifier).connect(widget.channelLogin);
     });
     _input.addListener(_onInputChanged);
+    _scroll.addListener(_onScroll);
   }
 
   @override
@@ -54,10 +59,33 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     _input
       ..removeListener(_onInputChanged)
       ..dispose();
-    _scroll.dispose();
+    _scroll
+      ..removeListener(_onScroll)
+      ..dispose();
     _focus.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    final nearBottom = pos.maxScrollExtent - pos.pixels <= _pinThreshold;
+    if (nearBottom != _pinnedToBottom) {
+      setState(() {
+        _pinnedToBottom = nearBottom;
+        if (nearBottom) _unreadWhileScrolled = false;
+      });
+    }
+  }
+
+  void _jumpToLatest() {
+    if (!_scroll.hasClients) return;
+    _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    setState(() {
+      _pinnedToBottom = true;
+      _unreadWhileScrolled = false;
+    });
   }
 
   void _onInputChanged() {
@@ -162,24 +190,33 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
     final chatFontFamily = ref.watch(
       settingsControllerProvider.select((s) => s.chatFontFamily),
     );
+    final fontScale = ref.watch(
+      settingsControllerProvider.select((s) => s.chatFontSizeScale),
+    );
     final pad = switch (density) {
       0 => 4.0,
       2 => 10.0,
       _ => 6.0,
     };
-    final fontSize = switch (density) {
+    final densityBase = switch (density) {
       0 => 12.0,
       2 => 16.0,
       _ => 14.0,
     };
+    final fontSize = densityBase * fontScale;
 
     ref.listen(chatControllerProvider, (prev, next) {
-      if (_scroll.hasClients) {
+      final prevLen = prev?.messages.length ?? 0;
+      final nextLen = next.messages.length;
+      if (nextLen <= prevLen) return;
+      if (_pinnedToBottom && _scroll.hasClients) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scroll.hasClients) {
+          if (_scroll.hasClients && _pinnedToBottom) {
             _scroll.jumpTo(_scroll.position.maxScrollExtent);
           }
         });
+      } else if (!_pinnedToBottom && mounted) {
+        setState(() => _unreadWhileScrolled = true);
       }
     });
 
@@ -298,31 +335,45 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
             ),
           ),
         Expanded(
-          child: ListView.builder(
-            controller: _scroll,
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: pad),
-            itemCount: visibleMessages.length,
-            itemBuilder: (context, index) {
-              final msg = visibleMessages[index];
-              return Padding(
-                padding: EdgeInsets.symmetric(vertical: pad / 2),
-                child: ChatMessageTile(
-                  message: msg,
-                  catalog: catalog,
-                  badges: badges,
-                  fontSize: fontSize,
-                  showTimestamp: chatTimestamps,
-                  maskLinks: maskLinks,
-                  chatFontFamily: chatFontFamily,
-                  onReply: canSend ? () => _startReply(msg) : null,
-                  onUserTap: () => showUserCard(
-                    context,
-                    login: msg.login,
-                    displayName: msg.displayName,
+          child: Stack(
+            children: [
+              ListView.builder(
+                controller: _scroll,
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: pad),
+                itemCount: visibleMessages.length,
+                itemBuilder: (context, index) {
+                  final msg = visibleMessages[index];
+                  return Padding(
+                    padding: EdgeInsets.symmetric(vertical: pad / 2),
+                    child: ChatMessageTile(
+                      message: msg,
+                      catalog: catalog,
+                      badges: badges,
+                      fontSize: fontSize,
+                      showTimestamp: chatTimestamps,
+                      maskLinks: maskLinks,
+                      chatFontFamily: chatFontFamily,
+                      onReply: canSend ? () => _startReply(msg) : null,
+                      onUserTap: () => showUserCard(
+                        context,
+                        login: msg.login,
+                        displayName: msg.displayName,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (_unreadWhileScrolled && !_pinnedToBottom)
+                Positioned(
+                  right: 12,
+                  bottom: 8,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _jumpToLatest,
+                    icon: const Icon(Icons.arrow_downward, size: 18),
+                    label: const Text('Jump to latest'),
                   ),
                 ),
-              );
-            },
+            ],
           ),
         ),
         if (_replyingTo != null)

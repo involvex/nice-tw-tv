@@ -79,25 +79,40 @@ class SettingsScreen extends ConsumerWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              for (final color in accentChoices)
-                GestureDetector(
-                  onTap: () => ref
-                      .read(settingsControllerProvider.notifier)
-                      .setAccent(color),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: settings.accentArgb == color.toARGB32()
-                            ? theme.colorScheme.onSurface
-                            : Colors.transparent,
-                        width: 2.5,
+              for (var i = 0; i < accentChoices.length; i++)
+                Builder(
+                  builder: (context) {
+                    final color = accentChoices[i];
+                    final label = accentChoiceLabels[i];
+                    final selected = settings.accentArgb == color.toARGB32();
+                    return Semantics(
+                      button: true,
+                      selected: selected,
+                      label: '$label accent',
+                      child: Tooltip(
+                        message: label,
+                        child: GestureDetector(
+                          onTap: () => ref
+                              .read(settingsControllerProvider.notifier)
+                              .setAccent(color),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selected
+                                    ? theme.colorScheme.onSurface
+                                    : Colors.transparent,
+                                width: 2.5,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
             ],
           ),
@@ -232,6 +247,26 @@ class SettingsScreen extends ConsumerWidget {
                   ref
                       .read(settingsControllerProvider.notifier)
                       .setVideoQuality(value);
+                },
+              ),
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Default volume'),
+            subtitle: Text('${(settings.videoVolume * 100).round()}%'),
+            trailing: SizedBox(
+              width: 160,
+              child: Slider(
+                value: settings.videoVolume.clamp(0.0, 1.0),
+                min: 0,
+                max: 1,
+                divisions: 20,
+                label: '${(settings.videoVolume * 100).round()}%',
+                onChanged: (value) {
+                  ref
+                      .read(settingsControllerProvider.notifier)
+                      .setVideoVolume(value);
                 },
               ),
             ),

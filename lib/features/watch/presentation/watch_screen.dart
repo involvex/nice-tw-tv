@@ -716,7 +716,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
                             isFollowing
                                 ? Icons.favorite
                                 : Icons.favorite_border,
-                            color: isFollowing ? Colors.red : null,
+                            color: isFollowing
+                                ? Theme.of(context).colorScheme.error
+                                : null,
                           ),
                         );
                       },

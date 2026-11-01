@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/widgets/nice_empty_state.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
@@ -40,7 +41,11 @@ class _AutoplayFeedState extends ConsumerState<AutoplayFeed> {
   @override
   Widget build(BuildContext context) {
     if (widget.streams.isEmpty) {
-      return const Center(child: Text('No live streams'));
+      return const NiceEmptyState(
+        icon: Icons.live_tv_outlined,
+        title: 'No live streams',
+        body: 'Nothing to autoplay right now.',
+      );
     }
 
     return PageView.builder(

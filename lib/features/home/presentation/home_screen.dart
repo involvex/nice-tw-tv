@@ -2,7 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/theme/nice_tv_theme.dart';
+import 'package:nice_tv/core/widgets/nice_empty_state.dart';
+import 'package:nice_tv/core/widgets/nice_error_pane.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
+import 'package:nice_tv/features/notifications/data/notifications_inbox.dart';
+import 'package:nice_tv/features/watch/data/player_overlay_controller.dart';
+import 'package:nice_tv/features/watch/presentation/mini_player.dart';
 import 'package:nice_tv/features/home/data/twitch_clip.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
 import 'package:nice_tv/features/home/presentation/autoplay_feed.dart';
@@ -72,6 +78,12 @@ class HomeScreen extends ConsumerWidget {
     final category = ref.watch(homeCategoryFilterProvider);
     final theme = Theme.of(context);
 
+    final unread = ref.watch(
+      notificationsInboxProvider.select((s) => s.unreadCount),
+    );
+    final miniVisible = ref.watch(miniPlayerControllerProvider) != null;
+    final listBottom = MiniPlayer.contentBottomPadding(miniVisible);
+
     if (mode == HomeFeedMode.autoplay && tab == HomeBrowseTab.live) {
       return Scaffold(
         extendBodyBehindAppBar: true,
@@ -95,6 +107,17 @@ class HomeScreen extends ConsumerWidget {
               icon: const Icon(Icons.search),
             ),
             IconButton(
+              tooltip: unread > 0
+                  ? 'Notifications, $unread unread'
+                  : 'Notifications',
+              onPressed: () => context.push('/notifications'),
+              icon: Badge(
+                isLabelVisible: unread > 0,
+                label: Text('$unread'),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+            ),
+            IconButton(
               tooltip: 'History',
               onPressed: () => context.push('/history'),
               icon: const Icon(Icons.history_outlined),
@@ -103,6 +126,18 @@ class HomeScreen extends ConsumerWidget {
         ),
         body: feed.isLoading && feed.streams.isEmpty
             ? const Center(child: CircularProgressIndicator())
+            : feed.error != null && feed.streams.isEmpty
+            ? NiceErrorPane.fromError(
+                error: feed.error!,
+                onRetry: () =>
+                    ref.read(popularFeedControllerProvider.notifier).refresh(),
+              )
+            : feed.streams.isEmpty
+            ? const NiceEmptyState(
+                icon: Icons.live_tv_outlined,
+                title: 'No live streams',
+                body: 'Pull to refresh or switch back to the card feed.',
+              )
             : AutoplayFeed(
                 streams: feed.streams,
                 onNearEnd: () =>
@@ -128,20 +163,32 @@ class HomeScreen extends ConsumerWidget {
           slivers: [
             SliverAppBar(
               pinned: true,
-              title: Text(
+              title: const Text(
                 'Nice TV',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               actions: [
+                IconButton(
+                  tooltip: 'Swipe feed',
+                  onPressed: () =>
+                      ref.read(homeFeedModeProvider.notifier).toggle(),
+                  icon: const Icon(Icons.swipe_vertical_outlined),
+                ),
                 IconButton(
                   tooltip: 'Search',
                   onPressed: () => context.push('/search'),
                   icon: const Icon(Icons.search),
                 ),
                 IconButton(
-                  tooltip: 'Notifications',
+                  tooltip: unread > 0
+                      ? 'Notifications, $unread unread'
+                      : 'Notifications',
                   onPressed: () => context.push('/notifications'),
-                  icon: const Icon(Icons.notifications_outlined),
+                  icon: Badge(
+                    isLabelVisible: unread > 0,
+                    label: Text('$unread'),
+                    child: const Icon(Icons.notifications_outlined),
+                  ),
                 ),
                 IconButton(
                   tooltip: 'History',
@@ -162,8 +209,8 @@ class HomeScreen extends ConsumerWidget {
                 )
               else if (feed.error != null && feed.streams.isEmpty)
                 SliverFillRemaining(
-                  child: _ErrorPane(
-                    message: feed.error!,
+                  child: NiceErrorPane.fromError(
+                    error: feed.error!,
                     onRetry: () => ref
                         .read(popularFeedControllerProvider.notifier)
                         .refresh(),
@@ -171,18 +218,17 @@ class HomeScreen extends ConsumerWidget {
                 )
               else if (feed.streams.isEmpty)
                 SliverFillRemaining(
-                  child: Center(
-                    child: Text(
-                      category == null
-                          ? 'No live streams found.'
-                          : 'No live streams in ${category.name}.',
-                      style: theme.textTheme.bodyLarge,
-                    ),
+                  child: NiceEmptyState(
+                    icon: Icons.live_tv_outlined,
+                    title: category == null
+                        ? 'No live streams found'
+                        : 'No live streams in ${category.name}',
+                    body: 'Try another category or clear discovery filters.',
                   ),
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, listBottom),
                   sliver: SliverList.separated(
                     itemCount:
                         feed.streams.length + (feed.cursor != null ? 1 : 0),
@@ -208,8 +254,8 @@ class HomeScreen extends ConsumerWidget {
                 )
               else if (clips.error != null && clips.clips.isEmpty)
                 SliverFillRemaining(
-                  child: _ErrorPane(
-                    message: clips.error!,
+                  child: NiceErrorPane.fromError(
+                    error: clips.error!,
                     onRetry: () => ref
                         .read(clipsFeedControllerProvider.notifier)
                         .refresh(),
@@ -228,7 +274,7 @@ class HomeScreen extends ConsumerWidget {
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, listBottom),
                   sliver: SliverList.separated(
                     itemCount:
                         clips.clips.length +
@@ -535,13 +581,16 @@ class StreamCard extends StatelessWidget {
                   Positioned(
                     left: 10,
                     bottom: 10,
-                    child: _Chip(
-                      color: const Color(0xFFE91916),
-                      child: Text(
-                        'LIVE · $viewers',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                    child: Semantics(
+                      label: 'Live, $viewers viewers',
+                      child: _Chip(
+                        color: NiceTvColors.of(context).liveBadge,
+                        child: Text(
+                          'LIVE · $viewers',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: NiceTvColors.of(context).onLiveBadge,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -710,28 +759,6 @@ class _Chip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: child,
-      ),
-    );
-  }
-}
-
-class _ErrorPane extends StatelessWidget {
-  const _ErrorPane({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: onRetry, child: const Text('Retry')),
-        ],
       ),
     );
   }

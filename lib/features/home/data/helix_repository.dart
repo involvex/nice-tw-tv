@@ -80,9 +80,32 @@ class HelixRepository {
       queryParameters: {'query': query.trim(), 'first': 20, 'live_only': true},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    final streams = data
+    final searchHits = data
         .map((e) => TwitchStream.fromJson(e as Map<String, dynamic>))
         .toList();
+    final userIds = searchHits
+        .map((s) => s.userId)
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (userIds.isEmpty) return StreamsPage(streams: searchHits);
+    final live = await getStreamsByUserIds(userIds);
+    return StreamsPage(
+      streams: mergeSearchWithLiveStreams(searchHits, live.streams),
+    );
+  }
+
+  /// Fetches live streams for many user IDs (Helix allows up to 100 per call).
+  Future<StreamsPage> getStreamsByUserIds(List<String> userIds) async {
+    if (userIds.isEmpty) return const StreamsPage(streams: []);
+    final batches = batchHelixIds(userIds, 100);
+    final streams = <TwitchStream>[];
+    for (final batch in batches) {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/helix/streams',
+        queryParameters: {'user_id': batch, 'first': batch.length},
+      );
+      streams.addAll(_parseStreamsPage(response.data!).streams);
+    }
     return StreamsPage(streams: streams);
   }
 
@@ -164,24 +187,24 @@ class HelixRepository {
     List<String> broadcasterIds,
   ) async {
     if (broadcasterIds.isEmpty) return const [];
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/helix/channels',
-      queryParameters: {for (final id in broadcasterIds) 'broadcaster_id': id},
-    );
-    final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data
-        .map((e) => TwitchChannelInfo.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final batches = batchHelixIds(broadcasterIds, 100);
+    final results = <TwitchChannelInfo>[];
+    for (final batch in batches) {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/helix/channels',
+        queryParameters: {'broadcaster_id': batch},
+      );
+      final data = response.data?['data'] as List<dynamic>? ?? [];
+      results.addAll(
+        data.map((e) => TwitchChannelInfo.fromJson(e as Map<String, dynamic>)),
+      );
+    }
+    return results;
   }
 
   Future<List<TwitchCategory>> getGamesByIds(List<String> ids) async {
     if (ids.isEmpty) return const [];
-    final valid = ids.where((id) => id.isNotEmpty).toList();
-    if (valid.isEmpty) return const [];
-    final batches = <List<String>>[];
-    for (var i = 0; i < valid.length; i += 50) {
-      batches.add(valid.sublist(i, (i + 50).clamp(0, valid.length)));
-    }
+    final batches = batchHelixIds(ids, 50);
     final results = <TwitchCategory>[];
     for (final batch in batches) {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -717,6 +740,14 @@ class FollowingFeedController extends Notifier<StreamFeedState> {
     ref.listen(settingsControllerProvider, (_, _) {
       // ignore: discarded_futures
       refresh();
+    });
+    ref.listen(authControllerProvider, (prev, next) {
+      final wasIn = prev?.value?.isLoggedIn == true;
+      final isIn = next.value?.isLoggedIn == true;
+      if (wasIn != isIn) {
+        // ignore: discarded_futures
+        refresh();
+      }
     });
     Future.microtask(refresh);
     return const StreamFeedState(isLoading: true);

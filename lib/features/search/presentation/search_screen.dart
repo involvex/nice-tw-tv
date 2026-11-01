@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/widgets/nice_error_pane.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/data/twitch_stream.dart';
@@ -94,6 +95,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               icon: const Icon(Icons.close),
             ),
           IconButton(
+            tooltip: 'Search',
             onPressed: () => _submit(_controller.text),
             icon: const Icon(Icons.search),
           ),
@@ -101,7 +103,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: results.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(e.toString())),
+        error: (e, _) => NiceErrorPane.fromError(
+          error: e,
+          onRetry: () => ref.invalidate(searchResultsProvider(_query)),
+        ),
         data: (data) {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -175,6 +180,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   width: 96,
                                   height: 128,
                                   fit: BoxFit.cover,
+                                  placeholder: (_, _) => ColoredBox(
+                                    color:
+                                        theme.colorScheme.surfaceContainerHigh,
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (_, _, _) => ColoredBox(
+                                    color:
+                                        theme.colorScheme.surfaceContainerHigh,
+                                    child: const Icon(Icons.category_outlined),
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 6),
@@ -219,6 +242,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         width: 96,
                         height: 54,
                         fit: BoxFit.cover,
+                        placeholder: (_, _) => ColoredBox(
+                          color: theme.colorScheme.surfaceContainerHigh,
+                        ),
+                        errorWidget: (_, _, _) => ColoredBox(
+                          color: theme.colorScheme.surfaceContainerHigh,
+                          child: const Icon(Icons.live_tv_outlined, size: 20),
+                        ),
                       ),
                     ),
                     title: Text(
@@ -226,7 +256,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: Text('${stream.userName} · ${stream.gameName}'),
+                    subtitle: Text(
+                      '${stream.userName} · ${stream.gameName}'
+                      '${stream.viewerCount > 0 ? ' · ${stream.viewerCount} viewers' : ''}',
+                    ),
                     onTap: () {
                       final uri = Uri(
                         path: '/watch/${stream.userLogin}',

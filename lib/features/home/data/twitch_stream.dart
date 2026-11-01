@@ -56,11 +56,84 @@ class TwitchStream {
     );
   }
 
+  TwitchStream copyWith({
+    String? id,
+    String? userId,
+    String? userLogin,
+    String? userName,
+    String? gameName,
+    String? gameId,
+    String? title,
+    int? viewerCount,
+    String? thumbnailUrl,
+    DateTime? startedAt,
+    bool? isMature,
+    String? language,
+  }) {
+    return TwitchStream(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      userLogin: userLogin ?? this.userLogin,
+      userName: userName ?? this.userName,
+      gameName: gameName ?? this.gameName,
+      gameId: gameId ?? this.gameId,
+      title: title ?? this.title,
+      viewerCount: viewerCount ?? this.viewerCount,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      startedAt: startedAt ?? this.startedAt,
+      isMature: isMature ?? this.isMature,
+      language: language ?? this.language,
+    );
+  }
+
   String sizedThumbnail({int width = 440, int height = 248}) {
     return thumbnailUrl
         .replaceAll('{width}', '$width')
         .replaceAll('{height}', '$height');
   }
+}
+
+/// Splits Helix multi-value query IDs into chunks of [maxPerRequest].
+///
+/// Empty strings are dropped. Used so map-style query params do not overwrite
+/// duplicate keys (e.g. only the last `broadcaster_id` would be sent).
+List<List<String>> batchHelixIds(List<String> ids, int maxPerRequest) {
+  assert(maxPerRequest > 0);
+  final valid = ids.where((id) => id.isNotEmpty).toList();
+  if (valid.isEmpty) return const [];
+  final batches = <List<String>>[];
+  for (var i = 0; i < valid.length; i += maxPerRequest) {
+    final end = (i + maxPerRequest).clamp(0, valid.length);
+    batches.add(valid.sublist(i, end));
+  }
+  return batches;
+}
+
+/// Merges Search Channels hits with `/helix/streams` rows.
+///
+/// Search Channels lacks `viewer_count` and uses the profile image as
+/// `thumbnail_url`. Prefer live stream fields when a matching user is online;
+/// drop hits that are no longer live.
+List<TwitchStream> mergeSearchWithLiveStreams(
+  List<TwitchStream> searchHits,
+  List<TwitchStream> liveStreams,
+) {
+  final byUserId = <String, TwitchStream>{
+    for (final s in liveStreams)
+      if (s.userId.isNotEmpty) s.userId: s,
+  };
+  final merged = <TwitchStream>[];
+  for (final hit in searchHits) {
+    final live = byUserId[hit.userId];
+    if (live == null) continue;
+    merged.add(
+      live.copyWith(
+        userLogin: live.userLogin.isNotEmpty ? live.userLogin : hit.userLogin,
+        userName: live.userName.isNotEmpty ? live.userName : hit.userName,
+      ),
+    );
+  }
+  return merged;
 }
 
 class StreamsPage {

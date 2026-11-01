@@ -270,3 +270,13 @@ const accentChoices = <Color>[
   Color(0xFF4CC9F0),
   Color(0xFFF72585),
 ];
+
+/// Accessible labels for [accentChoices] swatches (same order).
+const accentChoiceLabels = <String>[
+  'Teal',
+  'Twitch purple',
+  'Orange',
+  'Sea green',
+  'Sky blue',
+  'Magenta',
+];

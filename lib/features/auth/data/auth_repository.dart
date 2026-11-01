@@ -39,7 +39,6 @@ class AuthRepository {
       'redirect_uri': AppEnv.redirectUri,
       'response_type': 'token',
       'scope': scopes,
-      'force_verify': 'true',
     });
     return uri.toString();
   }

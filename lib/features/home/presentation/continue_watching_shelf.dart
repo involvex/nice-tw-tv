@@ -117,7 +117,7 @@ class _ContinueWatchingCard extends StatelessWidget {
                       bottom: 10,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE91916),
+                          color: Colors.black87,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Padding(

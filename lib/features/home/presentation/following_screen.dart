@@ -2,11 +2,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/widgets/nice_empty_state.dart';
+import 'package:nice_tv/core/widgets/nice_error_pane.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/home/data/helix_repository.dart';
 import 'package:nice_tv/features/home/data/twitch_models.dart';
 import 'package:nice_tv/features/home/presentation/home_screen.dart';
 import 'package:nice_tv/features/home/presentation/offline_channels_section.dart';
+import 'package:nice_tv/features/watch/data/player_overlay_controller.dart';
+import 'package:nice_tv/features/watch/presentation/mini_player.dart';
 
 class FollowingScreen extends ConsumerWidget {
   const FollowingScreen({super.key});
@@ -16,30 +20,19 @@ class FollowingScreen extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider).value;
     final feed = ref.watch(followingFeedControllerProvider);
     final categories = ref.watch(followedCategoriesProvider);
-    final theme = Theme.of(context);
+    final listBottom = MiniPlayer.contentBottomPadding(
+      ref.watch(miniPlayerControllerProvider) != null,
+    );
 
     if (auth?.isLoggedIn != true) {
       return Scaffold(
         appBar: AppBar(title: const Text('Following')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Sign in to see live channels you follow.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => context.push('/login'),
-                  child: const Text('Sign in with Twitch'),
-                ),
-              ],
-            ),
-          ),
+        body: NiceEmptyState(
+          icon: Icons.favorite_outline,
+          title: 'Sign in to see who you follow',
+          body: 'Live channels from your Twitch follows show up here.',
+          actionLabel: 'Sign in with Twitch',
+          onAction: () => context.push('/login'),
         ),
       );
     }
@@ -59,7 +52,7 @@ class FollowingScreen extends ConsumerWidget {
                 ref.invalidate(followedCategoriesProvider);
               },
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                padding: EdgeInsets.fromLTRB(16, 8, 16, listBottom),
                 children: [
                   if (feed.isLoading && feed.streams.isEmpty)
                     const SizedBox(
@@ -67,29 +60,23 @@ class FollowingScreen extends ConsumerWidget {
                       child: Center(child: CircularProgressIndicator()),
                     )
                   else if (feed.error != null && feed.streams.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          Text(feed.error!, textAlign: TextAlign.center),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: () => ref
-                                .read(followingFeedControllerProvider.notifier)
-                                .refresh(),
-                            child: const Text('Retry'),
-                          ),
-                        ],
+                    SizedBox(
+                      height: 280,
+                      child: NiceErrorPane.fromError(
+                        error: feed.error!,
+                        onRetry: () => ref
+                            .read(followingFeedControllerProvider.notifier)
+                            .refresh(),
                       ),
                     )
                   else if (feed.streams.isEmpty)
-                    SizedBox(
-                      height: 200,
-                      child: Center(
-                        child: Text(
-                          'No followed live channels right now.',
-                          style: theme.textTheme.bodyLarge,
-                        ),
+                    const SizedBox(
+                      height: 240,
+                      child: NiceEmptyState(
+                        icon: Icons.live_tv_outlined,
+                        title: 'Nobody you follow is live',
+                        body:
+                            'Offline follows are listed below when available.',
                       ),
                     )
                   else
@@ -158,9 +145,8 @@ class _FollowedCategoriesStrip extends StatelessWidget {
             separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final category = list[index];
-              return FilterChip(
+              return ActionChip(
                 label: Text(category.name),
-                selected: false,
                 avatar: category.boxArtUrl.isEmpty
                     ? null
                     : CircleAvatar(
@@ -168,7 +154,7 @@ class _FollowedCategoriesStrip extends StatelessWidget {
                           category.sizedBoxArt(width: 52, height: 72),
                         ),
                       ),
-                onSelected: (_) => context.push(
+                onPressed: () => context.push(
                   '/category/${category.id}?name=${Uri.encodeComponent(category.name)}',
                 ),
               );

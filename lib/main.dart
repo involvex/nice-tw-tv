@@ -81,6 +81,9 @@ class _NiceTvAppState extends ConsumerState<NiceTvApp> {
     if (!AppEnv.isConfigured) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: NiceTvTheme.light(kNiceTvSeed),
+        darkTheme: NiceTvTheme.dark(kNiceTvSeed),
+        themeMode: ThemeMode.system,
         home: Scaffold(
           body: Center(
             child: Padding(
@@ -90,7 +93,6 @@ class _NiceTvAppState extends ConsumerState<NiceTvApp> {
                 'Add CLIENT_ID and either SECRET (local) or '
                 'TOKEN_PROXY_URL (production) to .env',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
           ),
