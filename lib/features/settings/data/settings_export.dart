@@ -23,6 +23,7 @@ String buildExportPayload(AppSettings settings) {
     'maskLinks': settings.maskLinks,
     'chatFontSizeScale': settings.chatFontSizeScale,
     'chatFontFamily': settings.chatFontFamily,
+    'autoAdvanceNext': settings.autoAdvanceNext,
   });
 }
 
@@ -52,6 +53,7 @@ AppSettings? parseExportPayload(String raw) {
       quietHoursEnabled: json['quietHoursEnabled'] as bool? ?? false,
       quietHoursStart: json['quietHoursStart'] as int? ?? 22 * 60,
       quietHoursEnd: json['quietHoursEnd'] as int? ?? 7 * 60,
+      autoAdvanceNext: json['autoAdvanceNext'] as bool? ?? false,
     );
   } on Object {
     return null;

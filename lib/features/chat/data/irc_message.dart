@@ -216,6 +216,9 @@ class IrcMessageParser {
 
   ChatMessage? toChatMessage(String raw) {
     final parsed = parseLine(raw);
+    if (parsed.command == 'USERNOTICE') {
+      return _userNoticeToMessage(parsed);
+    }
     if (parsed.command != 'PRIVMSG' || parsed.params.length < 2) return null;
     final channel = parsed.params.first.replaceFirst('#', '');
     final message = parsed.params.last;
@@ -260,6 +263,80 @@ class IrcMessageParser {
       bits: bits,
       replyParent: reply,
     );
+  }
+
+  /// Converts Twitch IRC `USERNOTICE` (raid, sub, announcement, …) into a
+  /// system [ChatMessage] using `system-msg` / `msg-id` tags.
+  ChatMessage? _userNoticeToMessage(
+    ({
+      Map<String, String> tags,
+      String? prefix,
+      String command,
+      List<String> params,
+    })
+    parsed,
+  ) {
+    if (parsed.params.isEmpty) return null;
+    final channel = parsed.params.first.replaceFirst('#', '');
+    final systemMsg = parsed.tags['system-msg']?.trim() ?? '';
+    final trailing = parsed.params.length > 1 ? parsed.params.last.trim() : '';
+    final msgId = parsed.tags['msg-id'] ?? '';
+    final login =
+        parsed.tags['login'] ?? (parsed.prefix?.split('!').first ?? 'system');
+    final display = parsed.tags['display-name']?.isNotEmpty == true
+        ? parsed.tags['display-name']!
+        : login;
+
+    var body = systemMsg;
+    if (body.isEmpty) {
+      body = _fallbackUserNoticeText(msgId: msgId, displayName: display);
+    }
+    if (trailing.isNotEmpty &&
+        (msgId == 'announcement' ||
+            msgId == 'resub' ||
+            msgId == 'sub' ||
+            msgId.startsWith('subgift') ||
+            msgId == 'giftpaidupgrade' ||
+            msgId == 'ritual')) {
+      final separator =
+          body.endsWith('.') || body.endsWith('!') || body.endsWith('?')
+          ? ' '
+          : ': ';
+      body = '$body$separator$trailing';
+    }
+    if (body.isEmpty) return null;
+
+    return ChatMessage(
+      id:
+          parsed.tags['id'] ??
+          'notice-${DateTime.now().microsecondsSinceEpoch}-$msgId',
+      channel: channel,
+      login: login,
+      displayName: display,
+      message: body,
+      color: null,
+      isAction: false,
+      timestamp: DateTime.now(),
+      system: true,
+      badges: ChatBadgeRef.parse(parsed.tags['badges']),
+    );
+  }
+
+  static String _fallbackUserNoticeText({
+    required String msgId,
+    required String displayName,
+  }) {
+    return switch (msgId) {
+      'sub' || 'resub' => '$displayName subscribed to the channel.',
+      'subgift' || 'anonsubgift' => '$displayName gifted a subscription.',
+      'submysterygift' => '$displayName is gifting subscriptions.',
+      'raid' => '$displayName is raiding the channel.',
+      'unraid' => 'The raid was cancelled.',
+      'announcement' => '$displayName made an announcement.',
+      'bitsbadgetier' => '$displayName unlocked a bits badge.',
+      'viewermilestone' => '$displayName hit a viewer milestone.',
+      _ => msgId.isEmpty ? '' : '$displayName: $msgId',
+    };
   }
 }
 
@@ -372,4 +449,15 @@ String formatChatTimestamp(DateTime timestamp) {
   final h = timestamp.hour.toString().padLeft(2, '0');
   final m = timestamp.minute.toString().padLeft(2, '0');
   return '$h:$m';
+}
+
+/// True when [message] mentions [login] as `@login` or a bare login token.
+bool messageMentionsLogin(ChatMessage message, String? login) {
+  if (login == null || login.isEmpty || message.system) return false;
+  final needle = login.toLowerCase();
+  final pattern = RegExp(
+    '(^|[^a-z0-9_])@?${RegExp.escape(needle)}([^a-z0-9_]|\$)',
+    caseSensitive: false,
+  );
+  return pattern.hasMatch(message.message);
 }

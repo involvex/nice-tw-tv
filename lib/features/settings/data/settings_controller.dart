@@ -25,6 +25,7 @@ class AppSettings {
     this.maskLinks = false,
     this.chatFontSizeScale = 1.0,
     this.chatFontFamily = 'Segoe UI',
+    this.autoAdvanceNext = false,
   });
 
   final ThemeMode themeMode;
@@ -45,6 +46,7 @@ class AppSettings {
   final bool maskLinks;
   final double chatFontSizeScale;
   final String chatFontFamily;
+  final bool autoAdvanceNext;
 
   Color get accent => Color(accentArgb);
 
@@ -67,6 +69,7 @@ class AppSettings {
     bool? maskLinks,
     double? chatFontSizeScale,
     String? chatFontFamily,
+    bool? autoAdvanceNext,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -87,6 +90,7 @@ class AppSettings {
       maskLinks: maskLinks ?? this.maskLinks,
       chatFontSizeScale: chatFontSizeScale ?? this.chatFontSizeScale,
       chatFontFamily: chatFontFamily ?? this.chatFontFamily,
+      autoAdvanceNext: autoAdvanceNext ?? this.autoAdvanceNext,
     );
   }
 
@@ -141,6 +145,7 @@ class SettingsController extends Notifier<AppSettings> {
       maskLinks: storage.maskLinks,
       chatFontSizeScale: storage.chatFontSizeScale,
       chatFontFamily: storage.chatFontFamily,
+      autoAdvanceNext: storage.autoAdvanceNext,
     );
   }
 
@@ -235,6 +240,11 @@ class SettingsController extends Notifier<AppSettings> {
     state = state.copyWith(chatFontFamily: value);
   }
 
+  Future<void> setAutoAdvanceNext(bool value) async {
+    await ref.read(settingsStorageProvider).setAutoAdvanceNext(value);
+    state = state.copyWith(autoAdvanceNext: value);
+  }
+
   Future<void> applySettings(AppSettings next) async {
     final storage = ref.read(settingsStorageProvider);
     await storage.setThemeMode(AppSettings.themeModeToString(next.themeMode));
@@ -255,6 +265,9 @@ class SettingsController extends Notifier<AppSettings> {
     );
     await storage.setChatTimestamps(next.chatTimestamps);
     await storage.setMaskLinks(next.maskLinks);
+    await storage.setChatFontSizeScale(next.chatFontSizeScale);
+    await storage.setChatFontFamily(next.chatFontFamily);
+    await storage.setAutoAdvanceNext(next.autoAdvanceNext);
     state = next;
   }
 }

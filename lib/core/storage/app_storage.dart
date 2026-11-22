@@ -57,6 +57,7 @@ class SettingsStorage {
   static const chatFontFamilyKey = 'chat_font_family';
   static const chatTimestampsKey = 'chat_timestamps';
   static const maskLinksKey = 'mask_links';
+  static const autoAdvanceNextKey = 'auto_advance_next';
 
   String get themeMode => _prefs.getString(themeModeKey) ?? 'system';
 
@@ -153,4 +154,9 @@ class SettingsStorage {
   bool get maskLinks => _prefs.getBool(maskLinksKey) ?? false;
 
   Future<void> setMaskLinks(bool value) => _prefs.setBool(maskLinksKey, value);
+
+  bool get autoAdvanceNext => _prefs.getBool(autoAdvanceNextKey) ?? false;
+
+  Future<void> setAutoAdvanceNext(bool value) =>
+      _prefs.setBool(autoAdvanceNextKey, value);
 }

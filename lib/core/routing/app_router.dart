@@ -105,11 +105,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final login = state.pathParameters['login']!;
           final title = state.uri.queryParameters['title'];
           final userId = state.uri.queryParameters['userId'];
+          final gameId = state.uri.queryParameters['gameId'];
           final fromPip = state.uri.queryParameters['fromPip'] == 'true';
           return WatchScreen(
             channelLogin: login,
             title: title,
             broadcasterId: userId,
+            gameId: gameId,
             fromPip: fromPip,
           );
         },

@@ -74,6 +74,81 @@ void main() {
       expect(parsed.command, 'PRIVMSG');
       expect(parsed.params, ['#c', 'hello there']);
     });
+
+    test('parses USERNOTICE raid as system message', () {
+      const raw =
+          '@badge-info=;badges=;color=;display-name=Raider;'
+          'id=raid-1;login=raider;msg-id=raid;'
+          'msg-param-displayName=Raider;msg-param-login=raider;'
+          'msg-param-viewerCount=42;'
+          'system-msg=42\\sraiders\\sfrom\\sRaider\\shave\\sjoined!;'
+          'room-id=1;user-id=9 '
+          ':tmi.twitch.tv USERNOTICE #ninja';
+      final message = const IrcMessageParser().toChatMessage(raw);
+      expect(message, isNotNull);
+      expect(message!.system, isTrue);
+      expect(message.message, '42 raiders from Raider have joined!');
+      expect(message.channel, 'ninja');
+      expect(message.login, 'raider');
+    });
+
+    test('parses USERNOTICE resub with trailing body', () {
+      const raw =
+          '@badge-info=subscriber/6;badges=subscriber/6;color=#FF0000;'
+          'display-name=Subber;id=resub-1;login=subber;msg-id=resub;'
+          'system-msg=Subber\\ssubscribed\\sfor\\s6\\smonths!;'
+          'room-id=1;user-id=8 '
+          ':tmi.twitch.tv USERNOTICE #chan :Love the stream';
+      final message = const IrcMessageParser().toChatMessage(raw);
+      expect(message, isNotNull);
+      expect(message!.system, isTrue);
+      expect(
+        message.message,
+        'Subber subscribed for 6 months! Love the stream',
+      );
+    });
+
+    test('parses USERNOTICE announcement', () {
+      const raw =
+          '@badge-info=;badges=moderator/1;color=#00FF00;'
+          'display-name=Mod;id=ann-1;login=mod;msg-id=announcement;'
+          'system-msg=;'
+          'room-id=1;user-id=7 '
+          ':tmi.twitch.tv USERNOTICE #chan :Servers are back up';
+      final message = const IrcMessageParser().toChatMessage(raw);
+      expect(message, isNotNull);
+      expect(message!.system, isTrue);
+      expect(message.message, 'Mod made an announcement. Servers are back up');
+    });
+  });
+
+  group('messageMentionsLogin', () {
+    ChatMessage msg(String text) => ChatMessage(
+      id: '1',
+      channel: 'c',
+      login: 'other',
+      displayName: 'Other',
+      message: text,
+      color: null,
+      isAction: false,
+      timestamp: DateTime(2024),
+    );
+
+    test('matches @login and bare login', () {
+      expect(messageMentionsLogin(msg('hey @CoolUser check this'), 'cooluser'), isTrue);
+      expect(messageMentionsLogin(msg('cooluser hello'), 'CoolUser'), isTrue);
+    });
+
+    test('ignores partial word matches and system rows', () {
+      expect(messageMentionsLogin(msg('cooluserdata'), 'cooluser'), isFalse);
+      expect(
+        messageMentionsLogin(
+          ChatMessage.system('cooluser joined'),
+          'cooluser',
+        ),
+        isFalse,
+      );
+    });
   });
 
   group('tokenizeMessage', () {

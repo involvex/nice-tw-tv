@@ -225,6 +225,19 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           Text('Stream', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Auto-advance'),
+            subtitle: const Text(
+              'When a stream or VOD ends, open the next similar stream or archive',
+            ),
+            value: settings.autoAdvanceNext,
+            onChanged: (value) {
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setAutoAdvanceNext(value);
+            },
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Default quality'),

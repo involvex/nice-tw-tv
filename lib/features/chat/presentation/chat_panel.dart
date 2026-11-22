@@ -353,6 +353,10 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                       showTimestamp: chatTimestamps,
                       maskLinks: maskLinks,
                       chatFontFamily: chatFontFamily,
+                      mentionHighlight: messageMentionsLogin(
+                        msg,
+                        auth?.login,
+                      ),
                       onReply: canSend ? () => _startReply(msg) : null,
                       onUserTap: () => showUserCard(
                         context,
@@ -629,6 +633,7 @@ class ChatMessageTile extends StatelessWidget {
     this.showTimestamp = false,
     this.maskLinks = false,
     this.chatFontFamily = 'Segoe UI',
+    this.mentionHighlight = false,
     this.onReply,
     this.onUserTap,
   });
@@ -640,6 +645,7 @@ class ChatMessageTile extends StatelessWidget {
   final String chatFontFamily;
   final bool showTimestamp;
   final bool maskLinks;
+  final bool mentionHighlight;
   final VoidCallback? onReply;
   final VoidCallback? onUserTap;
 
@@ -663,7 +669,7 @@ class ChatMessageTile extends StatelessWidget {
     final resolvedBadges = badges.resolveAll(message.badges);
     final cheerColor = theme.colorScheme.tertiary;
 
-    return InkWell(
+    final tile = InkWell(
       onLongPress: onReply,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -771,6 +777,21 @@ class ChatMessageTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (!mentionHighlight) return tile;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(6),
+        border: Border(
+          left: BorderSide(color: theme.colorScheme.primary, width: 3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: tile,
       ),
     );
   }

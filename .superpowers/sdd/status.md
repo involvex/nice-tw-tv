@@ -1,5 +1,5 @@
 DONE
 
-Channel Enrichment plan: all 4 tasks complete (Task 1 channel panels, Task 2 VOD chapters, Task 3 history search, Task 4 theater mode).
+Channel Enrichment, chat/settings personalization, and discovery/profile plans are in the tree (shipped as 1.4.0 notes).
 
-Next plan: Chat Personalization (docs/superpowers/plans/2026-08-20-chat-personalization.md) — not yet started.
+Channel moments + playback handoff shipped as 1.5.0 (USERNOTICE system rows, mention highlight, live/VOD end handoff, auto-advance).
