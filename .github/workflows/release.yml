@@ -53,6 +53,21 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # `.env` is listed as a Flutter asset but is gitignored. Materialize a
+      # release env (public CLIENT_ID + token proxy; never ship SECRET).
+      - name: Create release .env asset
+        env:
+          CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+        run: |
+          if [ -z "$CLIENT_ID" ]; then
+            echo "Missing TWITCH_CLIENT_ID repository secret" >&2
+            exit 1
+          fi
+          printf '%s\n' \
+            "CLIENT_ID=$CLIENT_ID" \
+            "TOKEN_PROXY_URL=https://nice-tv-token-proxy.involvex.workers.dev" \
+            > .env
+
       - name: Build release APK
         run: flutter build apk --release
 
