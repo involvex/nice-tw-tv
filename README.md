@@ -2,20 +2,21 @@
 
 Modern Android-first Twitch client built with Flutter. Clean-room implementation inspired by the architecture of third-party clients like Frosty — not a fork.
 
-## Features (MVP → v1.3)
+## Features (MVP → v1.5)
 
 - Twitch frontpage: popular live streams + following feed with infinite scroll
 - Card feed ↔ fullscreen autoplay swipe toggle
-- Search (live channels + categories), channel profiles
-- VOD shelf from popular channels’ recent archives
+- Search (live channels + categories), channel profiles (panels, schedule, clips)
+- VOD shelf, chapters, continue watching, and next-archive handoff
 - Live/VOD watch via Twitch embed JS bridge **or** experimental native HLS (quality variants + auto-fallback to embed)
-- Android Picture-in-Picture
-- Per-streamer layout profiles (chat placement, density, split ratio, player)
-- IRC chat with reconnect, badges, replies (long-press), and cheer highlighting
+- Playback handoff when a stream/VOD ends (similar live / next archive + optional auto-advance)
+- Android Picture-in-Picture + mini player
+- Per-streamer layout profiles (chat placement, density, split ratio, player, accent/quality)
+- IRC chat with reconnect, badges, replies, USERNOTICE moments, mention highlight, and cheer highlighting
 - BTTV / FFZ / 7TV emotes + live 7TV set updates
 - Emote autocomplete and tabbed emote picker with search
 - Live alerts: poll + EventSub WebSocket + local OS notifications (optional remote FCM via worker)
-- Light / dark / system themes with accent customization
+- Light / dark / high-contrast / system themes with accent customization
 - Twitch OAuth (redirect `https://twitch.tv/login`)
 
 ## Setup

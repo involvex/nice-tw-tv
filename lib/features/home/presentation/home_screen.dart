@@ -556,7 +556,11 @@ class StreamCard extends StatelessWidget {
           onTap: () {
             final uri = Uri(
               path: '/watch/${stream.userLogin}',
-              queryParameters: {'title': stream.title, 'userId': stream.userId},
+              queryParameters: {
+                'title': stream.title,
+                'userId': stream.userId,
+                'gameId': stream.gameId,
+              },
             );
             context.push(uri.toString());
           },

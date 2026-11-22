@@ -11,10 +11,15 @@ import 'package:nice_tv/features/profile/data/follow_controller.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
 import 'package:nice_tv/features/settings/data/settings_controller.dart';
 import 'package:nice_tv/features/vod/data/vod_progress_store.dart';
+import 'package:nice_tv/features/home/data/helix_repository.dart';
+import 'package:nice_tv/features/home/data/twitch_stream.dart';
+import 'package:nice_tv/features/vod/data/twitch_vod.dart';
+import 'package:nice_tv/features/watch/data/playback_handoff.dart';
 import 'package:nice_tv/features/watch/data/pip_service.dart';
 import 'package:nice_tv/features/watch/data/mini_player_player_provider.dart';
 import 'package:nice_tv/features/watch/data/player_overlay_controller.dart';
 import 'package:nice_tv/features/watch/presentation/native_hls_player.dart';
+import 'package:nice_tv/features/watch/presentation/playback_handoff_overlay.dart';
 import 'package:nice_tv/features/watch/presentation/twitch_embed_player.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +33,7 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.vodId,
     this.clipId,
     this.thumbnailUrl,
+    this.gameId,
     this.fromPip = false,
   });
 
@@ -37,6 +43,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   final String? vodId;
   final String? clipId;
   final String? thumbnailUrl;
+  final String? gameId;
   final bool fromPip;
 
   @override
@@ -62,6 +69,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
   bool _routeSubscribed = false;
   bool _uiHidden = false;
   Timer? _uiHideTimer;
+  bool _handoffVisible = false;
+  bool _handoffLoading = false;
+  bool _handoffTriggered = false;
+  List<TwitchStream> _handoffStreams = const [];
+  TwitchVod? _handoffVod;
 
   @override
   void didChangeDependencies() {
@@ -404,6 +416,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     if (event.quality != null && event.quality!.isNotEmpty) {
       setState(() => _activeQuality = event.quality);
     }
+    if (event.type == 'ended' || event.type == 'offline') {
+      _onPlaybackEnded();
+    }
   }
 
   void _onNativeFailed(Object error) {
@@ -415,6 +430,85 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
         content: Text('Native HLS failed — switched to embed player'),
       ),
     );
+  }
+
+  Future<void> _onPlaybackEnded() async {
+    if (_handoffTriggered || widget.clipId != null) return;
+    _handoffTriggered = true;
+    if (!mounted) return;
+    setState(() {
+      _handoffVisible = true;
+      _handoffLoading = true;
+      _handoffStreams = const [];
+      _handoffVod = null;
+    });
+
+    final helix = ref.read(helixRepositoryProvider);
+    final autoAdvance = ref.read(settingsControllerProvider).autoAdvanceNext;
+    try {
+      if (widget.vodId != null) {
+        final next = await resolveNextArchiveHandoff(
+          helix,
+          currentVodId: widget.vodId!,
+          broadcasterId: widget.broadcasterId,
+          channelLogin: widget.channelLogin,
+        );
+        if (!mounted) return;
+        if (autoAdvance && next != null) {
+          _openHandoffVod(next);
+          return;
+        }
+        setState(() {
+          _handoffVod = next;
+          _handoffLoading = false;
+        });
+        return;
+      }
+
+      final similar = await resolveSimilarLiveHandoff(
+        helix,
+        broadcasterId: widget.broadcasterId,
+        channelLogin: widget.channelLogin,
+        gameId: widget.gameId,
+      );
+      if (!mounted) return;
+      if (autoAdvance && similar.isNotEmpty) {
+        _openHandoffStream(similar.first);
+        return;
+      }
+      setState(() {
+        _handoffStreams = similar;
+        _handoffLoading = false;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() => _handoffLoading = false);
+    }
+  }
+
+  void _openHandoffStream(TwitchStream stream) {
+    final uri = Uri(
+      path: '/watch/${stream.userLogin}',
+      queryParameters: {
+        'title': stream.title,
+        'userId': stream.userId,
+        'gameId': stream.gameId,
+      },
+    );
+    context.go(uri.toString());
+  }
+
+  void _openHandoffVod(TwitchVod vod) {
+    final uri = Uri(
+      path: '/vod/${vod.id}',
+      queryParameters: {
+        'title': vod.title,
+        'login': vod.userLogin,
+        'userId': vod.userId,
+        'thumbnailUrl': vod.thumbnailUrl,
+      },
+    );
+    context.go(uri.toString());
   }
 
   Future<void> _openLayoutSheet() async {
@@ -588,42 +682,64 @@ class _WatchScreenState extends ConsumerState<WatchScreen>
     final videoFlex = (profile.videoChatRatio * 10).round().clamp(4, 8);
     final chatFlex = (10 - videoFlex).clamp(2, 6);
 
+    final playerCore = useNative
+        ? NativeHlsPlayer(
+            key: _nativeKey,
+            externalPlayer: ref.read(miniPlayerMediaKitPlayerProvider),
+            channelLogin: widget.vodId == null ? widget.channelLogin : null,
+            vodId: widget.vodId,
+            initialQuality: quality,
+            initialMuted: settings.videoMuted,
+            initialVolume: settings.videoVolume,
+            resumePosition: _resumePosition,
+            initialPlaybackSpeed: settings.playbackSpeed,
+            onFailed: _onNativeFailed,
+            onEnded: _onPlaybackEnded,
+            onQualities: (names) {
+              if (!mounted) return;
+              setState(() {
+                _qualities = names;
+                _activeQuality ??= quality;
+              });
+            },
+          )
+        : TwitchEmbedPlayer(
+            key: _embedKey,
+            channelLogin: isClip || widget.vodId != null
+                ? null
+                : widget.channelLogin,
+            vodId: widget.vodId,
+            clipId: widget.clipId,
+            initialQuality: quality,
+            initialMuted: settings.videoMuted,
+            initialVolume: settings.videoVolume,
+            resumePosition: _resumePosition,
+            initialPlaybackSpeed: settings.playbackSpeed,
+            onEvent: _onPlayerEvent,
+          );
+
     final player = AspectRatio(
       aspectRatio: 16 / 9,
-      child: useNative
-          ? NativeHlsPlayer(
-              key: _nativeKey,
-              externalPlayer: ref.read(miniPlayerMediaKitPlayerProvider),
-              channelLogin: widget.vodId == null ? widget.channelLogin : null,
-              vodId: widget.vodId,
-              initialQuality: quality,
-              initialMuted: settings.videoMuted,
-              initialVolume: settings.videoVolume,
-              resumePosition: _resumePosition,
-              initialPlaybackSpeed: settings.playbackSpeed,
-              onFailed: _onNativeFailed,
-              onQualities: (names) {
-                if (!mounted) return;
-                setState(() {
-                  _qualities = names;
-                  _activeQuality ??= quality;
-                });
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          playerCore,
+          if (_handoffVisible)
+            PlaybackHandoffOverlay(
+              title: widget.vodId != null
+                  ? 'VOD finished'
+                  : 'Stream ended',
+              loading: _handoffLoading,
+              similarStreams: _handoffStreams,
+              nextVod: _handoffVod,
+              onDismiss: () {
+                setState(() => _handoffVisible = false);
               },
-            )
-          : TwitchEmbedPlayer(
-              key: _embedKey,
-              channelLogin: isClip || widget.vodId != null
-                  ? null
-                  : widget.channelLogin,
-              vodId: widget.vodId,
-              clipId: widget.clipId,
-              initialQuality: quality,
-              initialMuted: settings.videoMuted,
-              initialVolume: settings.videoVolume,
-              resumePosition: _resumePosition,
-              initialPlaybackSpeed: settings.playbackSpeed,
-              onEvent: _onPlayerEvent,
+              onOpenStream: _openHandoffStream,
+              onOpenVod: _openHandoffVod,
             ),
+        ],
+      ),
     );
 
     final chat = ChatPanel(

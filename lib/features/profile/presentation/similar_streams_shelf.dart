@@ -65,6 +65,7 @@ class SimilarStreamsShelf extends ConsumerWidget {
                         queryParameters: {
                           'title': stream.title,
                           'userId': stream.userId,
+                          'gameId': stream.gameId,
                         },
                       );
                       context.push(uri.toString());

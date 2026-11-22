@@ -12,6 +12,7 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
     this.channelLogin,
     this.vodId,
     this.onFailed,
+    this.onEnded,
     this.onQualities,
     this.initialQuality,
     this.initialMuted = false,
@@ -27,6 +28,7 @@ class NativeHlsPlayer extends ConsumerStatefulWidget {
   final String? channelLogin;
   final String? vodId;
   final ValueChanged<Object>? onFailed;
+  final VoidCallback? onEnded;
   final ValueChanged<List<String>>? onQualities;
   final String? initialQuality;
   final bool initialMuted;
@@ -56,12 +58,19 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
   String get activeQuality => _activeQuality;
   var _disposed = false;
   var _openGeneration = 0;
+  StreamSubscription<bool>? _completedSub;
+  var _endedReported = false;
 
   @override
   void initState() {
     super.initState();
     _player = widget.externalPlayer ?? Player();
     _controller = VideoController(_player);
+    _completedSub = _player.stream.completed.listen((completed) {
+      if (!completed || _disposed || _endedReported) return;
+      _endedReported = true;
+      widget.onEnded?.call();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_disposed) _open();
     });
@@ -74,6 +83,7 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
     if (oldWidget.channelLogin != widget.channelLogin ||
         oldWidget.vodId != widget.vodId) {
       _failureReported = false;
+      _endedReported = false;
       // ignore: discarded_futures
       _open();
     }
@@ -202,6 +212,8 @@ class NativeHlsPlayerState extends ConsumerState<NativeHlsPlayer> {
     // its provider's onDispose (double-dispose segfaults libmpv).
     _disposed = true;
     _openGeneration++;
+    // ignore: discarded_futures
+    _completedSub?.cancel();
     // ignore: discarded_futures
     _player.pause();
     if (widget.externalPlayer == null) {

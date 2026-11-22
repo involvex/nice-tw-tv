@@ -103,6 +103,14 @@
         });
       });
 
+      player.addEventListener(Twitch.Player.ENDED, function () {
+        post({ type: 'ended' });
+      });
+
+      player.addEventListener(Twitch.Player.OFFLINE, function () {
+        post({ type: 'offline' });
+      });
+
       window.NiceTvSetMuted = function (muted) {
         try { player.setMuted(muted); } catch (e) {}
       };

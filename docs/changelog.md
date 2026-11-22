@@ -10,6 +10,27 @@ All notable changes to Nice TV will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-11-22
+
+### Added
+- Channel moments in chat from IRC USERNOTICE (raids, subs, announcements, and related ritual events)
+- Mention highlighting when chat messages include your Twitch login
+- Playback handoff: when a live stream or VOD ends, offer similar live streams or the next archive
+- Auto-advance setting to open the next handoff target automatically
+
+## [1.4.0] - 2026-08-20
+
+### Added
+- Chat user cards, in-room search, block list, timeout/ban commands, room-state badges, and persisted history
+- Chat timestamps, font size/family, and link masking
+- Channel panels, schedule, clips shelf, similar streams, share, and offline followed channels
+- Theater mode, VOD chapters, continue-watching shelf, mini player, playback speed, and VOD resume
+- High contrast theme, quiet hours, per-channel notification mutes, and settings export/import
+- Per-channel accent color and quality overrides
+
+### Changed
+- Channel profiles and discovery surfaces are richer without leaving the app
+
 ## [1.3.0] - 2026-08-12
 
 ### Added
