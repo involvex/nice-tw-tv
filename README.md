@@ -2,7 +2,7 @@
 
 Modern Android-first Twitch client built with Flutter. Clean-room implementation inspired by the architecture of third-party clients like Frosty — not a fork.
 
-## Features (MVP → v1.5)
+## Features (MVP → v1.6)
 
 - Twitch frontpage: popular live streams + following feed with infinite scroll
 - Card feed ↔ fullscreen autoplay swipe toggle
@@ -17,7 +17,7 @@ Modern Android-first Twitch client built with Flutter. Clean-room implementation
 - Emote autocomplete and tabbed emote picker with search
 - Live alerts: poll + EventSub WebSocket + local OS notifications (optional remote FCM via worker)
 - Light / dark / high-contrast / system themes with accent customization
-- Twitch OAuth (redirect `https://twitch.tv/login`)
+- Twitch OAuth (redirect `https://twitch.tv/login`) with multi-account switcher
 
 ## Setup
 

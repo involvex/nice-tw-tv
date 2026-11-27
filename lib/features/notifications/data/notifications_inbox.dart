@@ -183,14 +183,19 @@ class NotificationsInboxController extends Notifier<NotificationsInboxState>
 
     ref.listen(authControllerProvider, (prev, next) {
       final loggedIn = next.value?.isLoggedIn == true;
-      if (loggedIn) {
+      final prevUserId = prev?.value?.userId;
+      final nextUserId = next.value?.userId;
+      if (!loggedIn) {
+        // ignore: discarded_futures
+        _stopEventSub();
+        return;
+      }
+      // Always restart EventSub when the active user changes (A→B switch).
+      if (prevUserId != nextUserId || prev?.value?.isLoggedIn != true) {
         // ignore: discarded_futures
         refresh(force: true);
         // ignore: discarded_futures
         _startEventSub();
-      } else {
-        // ignore: discarded_futures
-        _stopEventSub();
       }
     });
 

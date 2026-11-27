@@ -29,8 +29,39 @@ class AuthRepository {
   String? _appToken;
   DateTime? _appTokenExpiry;
   AuthSession _session = AuthSession.anonymous;
+  List<StoredTwitchAccount> _inactiveAccounts = const [];
 
   AuthSession get session => _session;
+
+  /// Parked accounts (not the active session).
+  List<StoredTwitchAccount> get inactiveAccounts =>
+      List.unmodifiable(_inactiveAccounts);
+
+  /// Active session plus parked accounts (active first when logged in).
+  List<StoredTwitchAccount> get allAccounts {
+    final active = _session.isLoggedIn &&
+            (_session.accessToken?.isNotEmpty ?? false) &&
+            (_session.login?.isNotEmpty ?? false) &&
+            (_session.userId?.isNotEmpty ?? false)
+        ? StoredTwitchAccount(
+            token: _session.accessToken!,
+            login: _session.login!,
+            userId: _session.userId!,
+          )
+        : null;
+    if (active == null) return List.unmodifiable(_inactiveAccounts);
+    return List.unmodifiable([
+      active,
+      ..._inactiveAccounts.where((a) => a.userId != active.userId),
+    ]);
+  }
+
+  /// True when another account can be added (active + inactive under cap).
+  bool get canAddAccount {
+    final count =
+        (_session.isLoggedIn ? 1 : 0) + _inactiveAccounts.length;
+    return count < TokenStorage.maxInactiveAccounts + 1;
+  }
 
   String buildAuthorizeUrl() {
     final scopes = AppEnv.oauthScopes.join(' ');
@@ -63,6 +94,9 @@ class AuthRepository {
   }
 
   Future<AuthSession> restore() async {
+    _inactiveAccounts = await tokenStorage.readInactiveAccounts();
+    await _pruneDeadInactiveAccounts();
+
     final token = await tokenStorage.readUserToken();
     if (token == null || token.isEmpty) {
       _session = AuthSession.anonymous;
@@ -81,10 +115,13 @@ class AuthRepository {
         login: user.$1,
         userId: user.$2,
       );
+      // Drop this user from inactive if it somehow appears there.
+      await tokenStorage.removeInactiveAccount(user.$2);
+      _inactiveAccounts = await tokenStorage.readInactiveAccounts();
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
-        // Token is truly dead — clear it.
+        // Token is truly dead — clear only the active session.
         await tokenStorage.clearUserSession();
         _session = AuthSession.anonymous;
       } else {
@@ -106,12 +143,27 @@ class AuthRepository {
     return _session;
   }
 
+  /// Completes OAuth. If an account is already active, parks it first.
   Future<AuthSession> completeLogin(String accessToken) async {
     final user = await _validateToken(accessToken);
-    await tokenStorage.writeUserSession(
+    final incoming = StoredTwitchAccount(
       token: accessToken,
       login: user.$1,
       userId: user.$2,
+    );
+
+    final current = await tokenStorage.readActiveAccount();
+    if (current != null && current.userId != incoming.userId) {
+      await tokenStorage.parkAccount(current);
+    }
+
+    // If re-logging the same or a parked account, pull it out of inactive.
+    await tokenStorage.removeInactiveAccount(incoming.userId);
+
+    await tokenStorage.writeUserSession(
+      token: incoming.token,
+      login: incoming.login,
+      userId: incoming.userId,
     );
     // Verify persistence — on some devices secure storage writes can
     // silently fail, which used to leave the UI "logged in" while nothing
@@ -120,6 +172,7 @@ class AuthRepository {
     if (persisted == null || persisted.isEmpty) {
       throw StateError('Could not persist session on this device');
     }
+    _inactiveAccounts = await tokenStorage.readInactiveAccounts();
     _session = AuthSession(
       isLoggedIn: true,
       accessToken: accessToken,
@@ -129,9 +182,61 @@ class AuthRepository {
     return _session;
   }
 
+  /// Signs out only the active account. Parked accounts stay.
   Future<void> logout() async {
     await tokenStorage.clearUserSession();
     _session = AuthSession.anonymous;
+    _inactiveAccounts = await tokenStorage.readInactiveAccounts();
+  }
+
+  /// Makes [userId] the active session (must be in the inactive list).
+  Future<AuthSession> switchAccount(String userId) async {
+    final inactive = await tokenStorage.readInactiveAccounts();
+    final target = inactive.where((a) => a.userId == userId).firstOrNull;
+    if (target == null) {
+      throw StateError('Account $userId is not saved');
+    }
+
+    final current = await tokenStorage.readActiveAccount();
+    final nextInactive = <StoredTwitchAccount>[
+      if (current != null && current.userId != target.userId) current,
+      ...inactive.where((a) => a.userId != target.userId),
+    ];
+    await tokenStorage.writeInactiveAccounts(nextInactive);
+    await tokenStorage.writeUserSession(
+      token: target.token,
+      login: target.login,
+      userId: target.userId,
+    );
+
+    final persisted = await tokenStorage.readUserToken();
+    if (persisted == null || persisted.isEmpty) {
+      throw StateError('Could not persist session on this device');
+    }
+
+    _inactiveAccounts = await tokenStorage.readInactiveAccounts();
+    _session = AuthSession(
+      isLoggedIn: true,
+      accessToken: target.token,
+      login: target.login,
+      userId: target.userId,
+    );
+    return _session;
+  }
+
+  /// Removes a parked account, or signs out when [userId] is active.
+  Future<void> removeAccount(String userId) async {
+    if (_session.userId == userId) {
+      await logout();
+      return;
+    }
+    await tokenStorage.removeInactiveAccount(userId);
+    _inactiveAccounts = await tokenStorage.readInactiveAccounts();
+  }
+
+  Future<List<StoredTwitchAccount>> listAccounts() async {
+    _inactiveAccounts = await tokenStorage.readInactiveAccounts();
+    return allAccounts;
   }
 
   /// Prefer user token; fall back to app (client-credentials) token.
@@ -212,6 +317,19 @@ class AuthRepository {
     }
     return (login, userId);
   }
+
+  Future<void> _pruneDeadInactiveAccounts() async {
+    if (_inactiveAccounts.isEmpty) return;
+    final kept = <StoredTwitchAccount>[];
+    for (final account in _inactiveAccounts) {
+      final valid = await isTokenValid(account.token);
+      if (valid) kept.add(account);
+    }
+    if (kept.length != _inactiveAccounts.length) {
+      await tokenStorage.writeInactiveAccounts(kept);
+      _inactiveAccounts = kept;
+    }
+  }
 }
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) => TokenStorage());
@@ -240,7 +358,33 @@ class AuthController extends AsyncNotifier<AuthSession> {
     await ref.read(authRepositoryProvider).logout();
     state = const AsyncData(AuthSession.anonymous);
   }
+
+  Future<void> switchAccount(String userId) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(authRepositoryProvider).switchAccount(userId),
+    );
+  }
+
+  Future<void> removeAccount(String userId) async {
+    final repo = ref.read(authRepositoryProvider);
+    final wasActive = state.value?.userId == userId;
+    await repo.removeAccount(userId);
+    if (wasActive) {
+      state = const AsyncData(AuthSession.anonymous);
+    } else {
+      // Trigger rebuild so savedAccountsProvider refreshes.
+      state = AsyncData(repo.session);
+    }
+  }
 }
 
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession>(AuthController.new);
+
+/// Saved accounts for the Settings UI (active + inactive).
+final savedAccountsProvider = Provider<List<StoredTwitchAccount>>((ref) {
+  // Depend on auth so the list rebuilds after login/switch/logout.
+  ref.watch(authControllerProvider);
+  return ref.watch(authRepositoryProvider).allAccounts;
+});

@@ -10,6 +10,13 @@ All notable changes to Nice TV will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-11-27
+
+### Added
+- Multi-account switcher: keep several Twitch logins on device and switch without wiping the others
+- Add account from Settings (OAuth parks the current session first)
+- Switch / remove saved accounts; sign out only clears the active session
+
 ## [1.5.0] - 2026-11-22
 
 ### Added

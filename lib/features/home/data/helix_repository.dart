@@ -744,7 +744,10 @@ class FollowingFeedController extends Notifier<StreamFeedState> {
     ref.listen(authControllerProvider, (prev, next) {
       final wasIn = prev?.value?.isLoggedIn == true;
       final isIn = next.value?.isLoggedIn == true;
-      if (wasIn != isIn) {
+      final prevUserId = prev?.value?.userId;
+      final nextUserId = next.value?.userId;
+      // Refresh on login/logout and when switching between accounts.
+      if (wasIn != isIn || prevUserId != nextUserId) {
         // ignore: discarded_futures
         refresh();
       }
