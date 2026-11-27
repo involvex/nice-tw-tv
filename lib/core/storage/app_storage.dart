@@ -1,5 +1,37 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// A Twitch OAuth session that can be active or parked inactive.
+class StoredTwitchAccount {
+  const StoredTwitchAccount({
+    required this.token,
+    required this.login,
+    required this.userId,
+  });
+
+  final String token;
+  final String login;
+  final String userId;
+
+  Map<String, String> toJson() => {
+    'token': token,
+    'login': login,
+    'userId': userId,
+  };
+
+  factory StoredTwitchAccount.fromJson(Map<String, dynamic> json) {
+    return StoredTwitchAccount(
+      token: json['token'] as String? ?? '',
+      login: json['login'] as String? ?? '',
+      userId: json['userId'] as String? ?? '',
+    );
+  }
+
+  bool get isValid =>
+      token.isNotEmpty && login.isNotEmpty && userId.isNotEmpty;
+}
 
 class TokenStorage {
   TokenStorage({FlutterSecureStorage? secureStorage})
@@ -8,6 +40,10 @@ class TokenStorage {
   static const _userTokenKey = 'twitch_user_access_token';
   static const _userLoginKey = 'twitch_user_login';
   static const _userIdKey = 'twitch_user_id';
+  static const _inactiveAccountsKey = 'twitch_inactive_accounts';
+
+  /// Max parked (inactive) accounts in addition to the active session.
+  static const maxInactiveAccounts = 4;
 
   final FlutterSecureStorage _secure;
 
@@ -31,6 +67,74 @@ class TokenStorage {
     await _secure.delete(key: _userTokenKey);
     await _secure.delete(key: _userLoginKey);
     await _secure.delete(key: _userIdKey);
+  }
+
+  Future<StoredTwitchAccount?> readActiveAccount() async {
+    final token = await readUserToken();
+    final login = await readLogin();
+    final userId = await readUserId();
+    if (token == null ||
+        token.isEmpty ||
+        login == null ||
+        login.isEmpty ||
+        userId == null ||
+        userId.isEmpty) {
+      return null;
+    }
+    return StoredTwitchAccount(token: token, login: login, userId: userId);
+  }
+
+  Future<List<StoredTwitchAccount>> readInactiveAccounts() async {
+    final raw = await _secure.read(key: _inactiveAccountsKey);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map(
+            (e) => StoredTwitchAccount.fromJson(Map<String, dynamic>.from(e)),
+          )
+          .where((a) => a.isValid)
+          .toList();
+    } on Object {
+      return const [];
+    }
+  }
+
+  Future<void> writeInactiveAccounts(List<StoredTwitchAccount> accounts) async {
+    final deduped = <String, StoredTwitchAccount>{};
+    for (final account in accounts) {
+      if (!account.isValid) continue;
+      deduped[account.userId] = account;
+    }
+    final list = deduped.values.take(maxInactiveAccounts).toList();
+    if (list.isEmpty) {
+      await _secure.delete(key: _inactiveAccountsKey);
+      return;
+    }
+    await _secure.write(
+      key: _inactiveAccountsKey,
+      value: jsonEncode(list.map((a) => a.toJson()).toList()),
+    );
+  }
+
+  /// Parks [account] in the inactive list (deduped by userId, capped).
+  Future<void> parkAccount(StoredTwitchAccount account) async {
+    if (!account.isValid) return;
+    final inactive = await readInactiveAccounts();
+    final next = [
+      account,
+      ...inactive.where((a) => a.userId != account.userId),
+    ];
+    await writeInactiveAccounts(next);
+  }
+
+  Future<void> removeInactiveAccount(String userId) async {
+    final inactive = await readInactiveAccounts();
+    await writeInactiveAccounts(
+      inactive.where((a) => a.userId != userId).toList(),
+    );
   }
 }
 

@@ -20,6 +20,7 @@ A curated set of features that can be implemented on top of the current Nice TV 
 - **Channel enrichment** — panels, schedule, clips shelf, share, offline followed, VOD chapters, history search, theater mode.
 - **Settings personalization** — high contrast, quiet hours, per-channel notification mutes, settings export/import.
 - **Channel moments & handoff (1.5)** — USERNOTICE system rows, mention highlight, live/VOD end handoff + auto-advance.
+- **Account switcher (1.6)** — multiple Twitch logins in Settings; park / switch / remove without wiping sibling sessions.
 
 ---
 
@@ -247,11 +248,7 @@ A curated set of features that can be implemented on top of the current Nice TV 
 **Status:** Already implemented (`accentArgb`, `qualityOverride` on layout profiles).
 
 ### 11.7 Account Switcher / Multi-Account
-**Priority:** Medium
-**Rationale:** Let users store multiple Twitch OAuth tokens and switch between accounts without logging out. Persist token list in `flutter_secure_storage`.
-**Affected files:**
-- `lib/features/auth/data/auth_repository.dart`
-- `lib/features/settings/presentation/settings_screen.dart`
+**Status:** Already implemented in 1.6 — Settings account list with add / switch / remove; inactive tokens parked in secure storage.
 
 ### 11.8 Autoplay Next VOD in Series
 **Status:** Already implemented in 1.5 playback handoff.
@@ -272,4 +269,4 @@ A curated set of features that can be implemented on top of the current Nice TV 
 
 ---
 
-*Last updated: 2026-11-22*
+*Last updated: 2026-11-27*

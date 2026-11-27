@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nice_tv/core/storage/app_storage.dart';
 import 'package:nice_tv/features/auth/data/auth_repository.dart';
 import 'package:nice_tv/features/notifications/data/muted_channels_store.dart';
 import 'package:nice_tv/features/settings/data/layout_profile.dart';
@@ -16,7 +17,10 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsControllerProvider);
     final auth = ref.watch(authControllerProvider).value;
+    final accounts = ref.watch(savedAccountsProvider);
+    final canAdd = ref.watch(authRepositoryProvider).canAddAccount;
     final theme = Theme.of(context);
+    final activeUserId = auth?.isLoggedIn == true ? auth?.userId : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -25,25 +29,38 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           Text('Account', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          if (auth?.isLoggedIn == true) ...[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.account_circle_outlined),
-              title: Text(
-                (auth?.login?.isNotEmpty ?? false) ? auth!.login! : 'Signed in',
-              ),
-              subtitle: const Text('Twitch account connected'),
-              trailing: TextButton(
-                onPressed: () =>
-                    ref.read(authControllerProvider.notifier).logout(),
-                child: const Text('Sign out'),
-              ),
-            ),
-          ] else
+          if (accounts.isEmpty)
             FilledButton.tonal(
               onPressed: () => context.push('/login'),
               child: const Text('Sign in with Twitch'),
-            ),
+            )
+          else ...[
+            for (final account in accounts)
+              _AccountTile(
+                account: account,
+                isActive: account.userId == activeUserId,
+                onSwitch: account.userId == activeUserId
+                    ? null
+                    : () => ref
+                          .read(authControllerProvider.notifier)
+                          .switchAccount(account.userId),
+                onRemove: account.userId == activeUserId
+                    ? null
+                    : () => ref
+                          .read(authControllerProvider.notifier)
+                          .removeAccount(account.userId),
+                onSignOut: account.userId == activeUserId
+                    ? () => ref.read(authControllerProvider.notifier).logout()
+                    : null,
+              ),
+            if (canAdd)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_add_alt_1_outlined),
+                title: const Text('Add account'),
+                onTap: () => context.push('/login'),
+              ),
+          ],
           const SizedBox(height: 24),
           Text('Appearance', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -571,6 +588,51 @@ class SettingsScreen extends ConsumerWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountTile extends StatelessWidget {
+  const _AccountTile({
+    required this.account,
+    required this.isActive,
+    this.onSwitch,
+    this.onRemove,
+    this.onSignOut,
+  });
+
+  final StoredTwitchAccount account;
+  final bool isActive;
+  final VoidCallback? onSwitch;
+  final VoidCallback? onRemove;
+  final VoidCallback? onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        isActive ? Icons.account_circle : Icons.account_circle_outlined,
+        color: isActive ? theme.colorScheme.primary : null,
+      ),
+      title: Text(account.login),
+      subtitle: Text(isActive ? 'Active' : 'Saved'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onSwitch != null)
+            TextButton(onPressed: onSwitch, child: const Text('Switch')),
+          if (onSignOut != null)
+            TextButton(onPressed: onSignOut, child: const Text('Sign out')),
+          if (onRemove != null)
+            IconButton(
+              tooltip: 'Remove saved account',
+              onPressed: onRemove,
+              icon: const Icon(Icons.delete_outline),
+            ),
         ],
       ),
     );

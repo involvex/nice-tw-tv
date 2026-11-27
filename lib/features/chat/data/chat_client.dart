@@ -212,6 +212,17 @@ class ChatController extends Notifier<ChatConnectionState> {
       _sub?.cancel();
       _client?.dispose();
     });
+    // Reconnect IRC when the active Twitch account changes while chatting.
+    ref.listen(authControllerProvider, (prev, next) {
+      final prevLogin = prev?.value?.login;
+      final nextLogin = next.value?.login;
+      final prevUserId = prev?.value?.userId;
+      final nextUserId = next.value?.userId;
+      if (_channel == null) return;
+      if (prevUserId == nextUserId && prevLogin == nextLogin) return;
+      // ignore: discarded_futures
+      connect(_channel!);
+    });
     return const ChatConnectionState();
   }
 
